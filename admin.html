@@ -1,0 +1,1121 @@
+<!DOCTYPE html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Gửi Người Thương | Link Tùy Chỉnh Toàn Bộ</title>
+    <!-- Tailwind CSS CDN cho styling hiện đại -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@400;700&family=Nunito:wght@400;600&display=swap"
+      rel="stylesheet"
+    />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/js/all.min.js"></script>
+    <style>
+      /* --- Cấu hình Tailwind + Font chung --- */
+      :root {
+        --color-primary: #f06292; /* Hồng đậm */
+        --color-secondary: #ffcdd2; /* Hồng nhạt */
+        --color-bg: #fce4ec; /* Background siêu nhạt */
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        height: 100vh;
+        width: 100vw;
+        background-color: var(--color-bg);
+        background-image: linear-gradient(135deg, #fce4ec 0%, #f7a2b9 100%);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        overflow: hidden;
+        font-family: "Nunito", sans-serif;
+        position: relative;
+        transition: opacity 0.5s;
+      }
+      /* Ẩn Generator khi xem Link đã tạo */
+      .is-custom-link #generator-ui {
+        display: none !important;
+      }
+      /* Ẩn Envelope khi ở chế độ Generator */
+      #generator-ui:not(:hidden) ~ .envelope-wrapper {
+        display: none;
+      }
+
+      /* --- Hiệu ứng tim bay nền (Background Particles) --- */
+      .bg-heart {
+        position: absolute;
+        top: -10vh;
+        background: rgba(255, 255, 255, 0.6);
+        backdrop-filter: blur(2px);
+        border-radius: 50%;
+        pointer-events: none;
+        animation: fall linear infinite;
+        font-size: 20px;
+        color: var(--color-secondary);
+      }
+      @keyframes fall {
+        0% {
+          transform: translateY(-10vh) translateX(0) rotate(0deg);
+          opacity: 1;
+        }
+        100% {
+          transform: translateY(110vh) translateX(20px) rotate(360deg);
+          opacity: 0;
+        }
+      }
+
+      /* --- Khối Phong Thư (Envelope) --- */
+      .envelope-wrapper {
+        position: relative;
+        cursor: pointer;
+        transition: transform 0.3s;
+        perspective: 1000px;
+        z-index: 50;
+      }
+      .envelope-wrapper:hover {
+        transform: scale(1.02);
+      }
+      .envelope {
+        position: relative;
+        width: 300px;
+        height: 200px;
+        background: var(--color-secondary);
+        border-radius: 8px;
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+        z-index: 20;
+        transition: background 0.5s;
+      }
+      .envelope::after {
+        content: "";
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        width: 0;
+        height: 0;
+        border-left: 150px solid transparent;
+        border-right: 150px solid transparent;
+        border-bottom: 100px solid var(--color-primary);
+        border-radius: 0 0 8px 8px;
+        z-index: 20;
+        pointer-events: none;
+        transition: border-bottom-color 0.5s;
+      }
+      .envelope::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 300px;
+        height: 200px;
+        background: var(--color-secondary);
+        z-index: 20;
+        pointer-events: none;
+        border-radius: 8px;
+        transition: background 0.5s;
+      }
+      .letter-preview {
+        position: absolute;
+        width: 270px;
+        height: 140px;
+        background: white;
+        border-radius: 5px;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+        z-index: 5;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        flex-direction: column;
+        transition: transform 0.8s ease-in-out, z-index 0.1s, opacity 0.5s;
+      }
+      .letter-preview.in-pocket {
+        top: 90px;
+        left: 15px;
+        opacity: 0;
+        z-index: 25;
+      }
+      .letter-preview .heart-seal {
+        font-size: 30px;
+        color: var(--color-secondary);
+        opacity: 1;
+      }
+      .flap {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 0;
+        height: 0;
+        border-left: 150px solid transparent;
+        border-right: 150px solid transparent;
+        border-top: 120px solid var(--color-primary);
+        transform-origin: top;
+        transition: transform 0.6s 0.4s ease-in-out;
+        z-index: 30;
+        border-top-left-radius: 8px;
+        border-top-right-radius: 8px;
+      }
+      .seal {
+        position: absolute;
+        top: 110px;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 20px;
+        height: 20px;
+        background: #d32f2f;
+        border-radius: 50%;
+        z-index: 40;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        color: white;
+        font-size: 10px;
+        cursor: pointer;
+        transition: opacity 0.4s 0.2s, transform 0.3s;
+      }
+      .seal i {
+        font-size: 10px;
+      }
+      .envelope-wrapper.open .flap {
+        transform: rotateX(180deg);
+        z-index: 1;
+      }
+      .envelope-wrapper.open .seal {
+        opacity: 0;
+        pointer-events: none;
+      }
+      .envelope-wrapper.open .letter-preview {
+        top: 10px;
+        left: 15px;
+        opacity: 1;
+        cursor: pointer;
+        z-index: 15;
+        animation: letter-pop 0.8s 0.5s ease-in-out forwards;
+      }
+      @keyframes letter-pop {
+        0% {
+          transform: translateY(0);
+          opacity: 1;
+        }
+        60% {
+          transform: translateY(-110px);
+        }
+        100% {
+          transform: translateY(-80px);
+        }
+      }
+      .envelope-wrapper.open .letter-preview:hover {
+        transform: translateY(-85px);
+        box-shadow: 0 -5px 10px rgba(0, 0, 0, 0.1);
+      }
+      /* --- Nội dung Thư (Popup) --- */
+      #full-letter {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.6);
+        z-index: 100;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.3s ease;
+      }
+      #full-letter.show {
+        opacity: 1;
+        pointer-events: auto;
+      }
+      .paper {
+        width: 90%;
+        max-width: 400px;
+        height: 80vh;
+        background: #fffafa;
+        border-radius: 10px;
+        box-shadow: 0 0 20px rgba(255, 255, 255, 0.4);
+        padding: 25px;
+        position: relative;
+        overflow-y: auto;
+        overflow-x: hidden;
+        transform: scale(0.8);
+        transition: transform 0.5s ease;
+        background-image: repeating-linear-gradient(
+          white 0px,
+          white 24px,
+          #e1e1e1 25px
+        );
+        line-height: 25px;
+        cursor: grab; /* Thêm cursor kéo/lướt */
+        touch-action: none; /* Ngăn chặn pull-to-refresh trên mobile */
+      }
+      #full-letter.show .paper {
+        transform: scale(1);
+      }
+      .paper::-webkit-scrollbar {
+        width: 0px;
+        background: transparent;
+      }
+      .paper-content {
+        margin-top: 10px;
+      }
+      .paper h2 {
+        font-family: "Dancing Script", cursive;
+        text-align: center;
+        color: #d62828;
+        font-size: 28px;
+        margin-bottom: 20px;
+        line-height: 1.2;
+      }
+      .paper p,
+      .signature {
+        font-family: "Nunito", sans-serif;
+        color: #4a4a4a;
+        font-size: 16px;
+        text-align: justify;
+        margin-bottom: 15px;
+        white-space: pre-wrap;
+        opacity: 0;
+        display: block;
+        transition: opacity 0.1s;
+      }
+      .signature {
+        font-family: "Dancing Script", cursive;
+        text-align: right;
+        font-size: 24px;
+        margin-top: 30px;
+        color: #d62828;
+      }
+      /* --- Điều khiển Nhạc --- */
+      .music-control {
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        z-index: 200;
+        background: white;
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        cursor: pointer;
+        color: var(--color-primary);
+      }
+      .note-anim {
+        animation: musicRotate 2s linear infinite;
+      }
+      @keyframes musicRotate {
+        0% {
+          transform: rotate(0deg) scale(1);
+        }
+        50% {
+          transform: rotate(180deg) scale(1.2);
+        }
+        100% {
+          transform: rotate(360deg) scale(1);
+        }
+      }
+      @media (max-width: 480px) {
+        .envelope {
+          width: 260px;
+          height: 170px;
+        }
+        .flap {
+          border-left-width: 130px;
+          border-right-width: 130px;
+          border-top-width: 105px;
+        }
+        .envelope::after {
+          border-left-width: 130px;
+          border-right-width: 130px;
+          border-bottom-width: 85px;
+        }
+        .envelope::before {
+          width: 260px;
+          height: 170px;
+        }
+        .letter-preview {
+          width: 230px;
+          height: 120px;
+        }
+        .letter-preview.in-pocket {
+          top: 75px;
+          left: 15px;
+        }
+        .seal {
+          top: 95px;
+        }
+        .paper {
+          max-width: 350px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <!-- Nhạc nền (Sẽ được thay đổi bằng JS nếu có tham số music) -->
+    <audio id="bg-music" loop>
+      <!-- Mặc định (Nếu không có tham số music) -->
+      <source src="sound.m4a" type="audio/mp4" />
+      <source src="sound.mp3" type="audio/mpeg" />
+    </audio>
+
+    <!-- Nút điều khiển nhạc -->
+    <div class="music-control" onclick="toggleMusic()">
+      <i id="music-icon" class="fa-solid fa-volume-xmark"></i>
+    </div>
+
+    <!-- Hiệu ứng tim bay -->
+    <div id="hearts-container"></div>
+
+    <!-- --- Giao diện Tạo Link Cá Nhân Hóa (Generator UI) --- -->
+    <div
+      id="generator-ui"
+      class="w-11/12 max-w-lg p-6 md:p-8 bg-white/80 backdrop-blur-sm rounded-xl shadow-2xl transition duration-500 ease-in-out z-10"
+    >
+      <h1
+        class="text-3xl font-bold text-center text-pink-600 mb-6 font-['Dancing_Script']"
+      >
+        💌 Tạo Thư Tình & Link Cá Nhân
+      </h1>
+      <form id="link-form" class="space-y-4">
+        <!-- Input Tiêu đề -->
+        <div>
+          <label for="title" class="block text-sm font-semibold text-gray-700"
+            >Tiêu đề thư (Parameter: t)</label
+          >
+          <input
+            type="text"
+            id="title"
+            value="Thư Tình Yêu"
+            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-3 border focus:border-pink-500 focus:ring-pink-500"
+            required
+          />
+        </div>
+        <!-- Input Người nhận -->
+        <div>
+          <label
+            for="recipient"
+            class="block text-sm font-semibold text-gray-700"
+            >Lời chào (Parameter: to)</label
+          >
+          <input
+            type="text"
+            id="recipient"
+            value="vợ yêu"
+            placeholder="Ví dụ: vợ yêu, ông xã, Tên người ấy..."
+            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-3 border focus:border-pink-500 focus:ring-pink-500"
+            required
+          />
+          <p class="text-xs text-gray-500 mt-1">
+            *Thư sẽ bắt đầu bằng: "Gửi [Lời chào],"
+          </p>
+        </div>
+        <!-- Input Nội dung -->
+        <div>
+          <label for="message" class="block text-sm font-semibold text-gray-700"
+            >Nội dung thư (Parameter: msg)</label
+          >
+          <textarea
+            id="message"
+            rows="6"
+            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-3 border focus:border-pink-500 focus:ring-pink-500"
+            required
+          >
+Hôm nay không phải dịp gì đặc biệt cả, nhưng em chỉ muốn gửi đến anh lời nhắn này. Em muốn anh biết rằng em yêu anh rất nhiều. Dù khoảng cách có xa, em vẫn muốn anh cảm thấy một chút ấm áp, mong anh giữ gìn sức khoẻ, giữ bình yên trong lòng, và luôn nhớ rằng em đang đợi anh. Chúc anh mỗi ngày đều may mắn và hạnh phúc hơn hôm qua.
+
+Em mong rằng thư này sẽ mang lại niềm vui cho anh, yêu anh hơn từng ngày!</textarea
+          >
+        </div>
+        <!-- Input Lời kết -->
+        <div>
+          <label
+            for="conclusion"
+            class="block text-sm font-semibold text-gray-700"
+            >Lời kết trước chữ ký (Parameter: con)</label
+          >
+          <input
+            type="text"
+            id="conclusion"
+            value="Yêu thương nhất,"
+            placeholder="Ví dụ: Gửi người em thương, Trân trọng,"
+            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-3 border focus:border-pink-500 focus:ring-pink-500"
+            required
+          />
+        </div>
+        <!-- Input Chữ ký -->
+        <div>
+          <label for="sender" class="block text-sm font-semibold text-gray-700"
+            >Chữ ký/Người gửi (Parameter: from)</label
+          >
+          <input
+            type="text"
+            id="sender"
+            value="ABC"
+            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-3 border focus:border-pink-500 focus:ring-pink-500"
+            required
+          />
+        </div>
+
+        <!-- Input Link Nhạc / Tải file MP3 (Cloudinary) -->
+        <div class="border p-4 rounded-lg bg-pink-50">
+          <label for="music" class="block text-sm font-bold text-pink-700 mb-2"
+            >Âm nhạc nền (Parameter: music)</label
+          >
+
+          <!-- Tùy chọn 1: Link nhạc (URL) -->
+          <input
+            type="url"
+            id="music-url"
+            placeholder="Dán Link nhạc (MP3/M4A/OGG) trực tiếp ở đây (Ưu tiên)"
+            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-3 border focus:border-pink-500 focus:ring-pink-500"
+          />
+
+          <div class="flex items-center space-x-3 my-2">
+            <hr class="flex-grow border-pink-200" />
+            <span class="text-xs text-pink-600 font-semibold"
+              >HOẶC (Sử dụng Cloudinary)</span
+            >
+            <hr class="flex-grow border-pink-200" />
+          </div>
+
+          <!-- Tùy chọn 2: Tải file MP3 cục bộ -->
+          <input
+            type="file"
+            id="music-file"
+            accept=".mp3"
+            class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-pink-100 file:text-pink-700 hover:file:bg-pink-200"
+          />
+          <p id="file-status" class="text-xs text-gray-600 mt-1 italic">
+            (Tệp tin sẽ được tải lên Cloudinary sau khi nhấn "Tạo Link")
+          </p>
+        </div>
+
+        <button
+          type="button"
+          id="generate-btn"
+          onclick="handleLinkGeneration()"
+          class="w-full py-3 px-4 bg-pink-500 text-white font-semibold rounded-lg shadow-lg hover:bg-pink-600 transition duration-300 transform hover:scale-[1.01]"
+        >
+          <i class="fa-solid fa-link mr-2"></i>Tạo Link Cá Nhân Hóa
+        </button>
+      </form>
+
+      <!-- Kết quả Link -->
+      <div
+        id="result-container"
+        class="mt-6 p-4 border border-green-400 bg-green-50 rounded-lg hidden"
+      >
+        <label class="block text-sm font-semibold text-green-700 mb-2"
+          >Link của bạn (Copy và gửi đi!)</label
+        >
+        <div class="flex items-center space-x-2">
+          <input
+            type="text"
+            id="generated-link"
+            readonly
+            class="flex-grow rounded-md border-gray-300 shadow-sm p-2 text-sm bg-white cursor-text"
+          />
+          <button
+            onclick="copyLink()"
+            class="p-2 bg-green-500 text-white rounded-md hover:bg-green-600 transition duration-150"
+          >
+            <i class="fa-solid fa-copy"></i>
+          </button>
+        </div>
+        <p
+          id="copy-message"
+          class="text-xs text-green-500 mt-2 opacity-0 transition duration-300"
+        >
+          Đã sao chép!
+        </p>
+        <a
+          id="test-link"
+          target="_blank"
+          class="mt-3 inline-block text-sm text-pink-600 hover:text-pink-800 underline transition duration-150"
+          >Mở thử Link này</a
+        >
+      </div>
+
+      <!-- Loading Indicator -->
+      <div
+        id="loading-indicator"
+        class="mt-4 p-3 bg-blue-100 text-blue-700 rounded-lg hidden"
+      >
+        <i class="fa-solid fa-cloud-arrow-up fa-spin mr-2"></i> Đang tải tệp MP3
+        lên Cloudinary... Vui lòng chờ.
+      </div>
+    </div>
+    <!-- --- Hết Giao diện Tạo Link --- -->
+
+    <!-- Phong thư (Chỉ hiển thị khi xem link đã tạo) -->
+    <div class="envelope-wrapper" onclick="openEnvelope()">
+      <div class="envelope">
+        <!-- Lá thư bên trong (Preview) -->
+        <div
+          id="letter-preview"
+          class="letter-preview in-pocket"
+          onclick="showFullLetter(event)"
+        >
+          <i class="fa-solid fa-heart heart-seal"></i>
+        </div>
+
+        <!-- Nắp phong bì (Phải là một thẻ riêng để lật) -->
+        <div class="flap"></div>
+
+        <!-- Tem trái tim khóa phong bì -->
+        <div class="seal">
+          <i class="fa-solid fa-heart"></i>
+        </div>
+      </div>
+    </div>
+
+    <!-- Nội dung thư đầy đủ (Popup) -->
+    <!-- Xóa onclick="hideFullLetter(event)" để chỉ dùng touch/swipe hoặc click vào dark overlay -->
+    <div id="full-letter">
+      <div class="paper" onclick="event.stopPropagation()">
+        <div class="paper-content">
+          <h2 id="custom-title">Thư Tình Yêu</h2>
+
+          <!-- Dòng 1: Lời chào (Customizable: to) -->
+          <p
+            class="letter-line"
+            data-text="Gửi người thương,"
+            id="greeting-line"
+          >
+            Gửi người thương,
+          </p>
+
+          <!-- Dòng 2: Nội dung chính (Customizable: msg) -->
+          <p
+            class="letter-line"
+            data-text="[Nội dung thư sẽ được tải từ link tùy chỉnh]"
+            id="body-line"
+          >
+            [Nội dung thư sẽ được tải từ link tùy chỉnh]
+          </p>
+
+          <!-- Chữ ký (Customizable: con, from) -->
+          <div
+            class="signature letter-line"
+            data-text="Yêu thương nhất,<br>ABC"
+            id="signature-line"
+          >
+            Yêu thương nhất,<br />
+            ABC
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      // =================================================================
+      // === CẤU HÌNH CLOUDINARY (QUAN TRỌNG: PHẢI THAY THẾ GIÁ TRỊ GIẢ) ===
+      // =================================================================
+      const CLOUD_NAME = "dys3wgutz"; // <-- THAY THẾ BẰNG CLOUD NAME CỦA BẠN
+      const UPLOAD_PRESET = "comic_raw_files_preset"; // <-- THAY THẾ BẰNG UPLOAD PRESET (PHẢI LÀ UNSIGNED)
+
+      // --- Cấu hình chung ---
+      const TYPING_SPEED = 30; // ms per character
+      const MUSIC_MAX_SIZE = 5 * 1024 * 1024; // Giới hạn 5MB
+      let isEnvelopeOpen = false;
+      let isTyping = false;
+      let typingTimeoutId = null;
+      let isUploading = false;
+
+      // Các elements
+      const music = document.getElementById("bg-music");
+      const musicIcon = document.getElementById("music-icon");
+      const fullLetter = document.getElementById("full-letter");
+      const letterLines = document.querySelectorAll(".letter-line");
+      const letterPreview = document.getElementById("letter-preview");
+      const generatorUI = document.getElementById("generator-ui");
+      const customTitleEl = document.getElementById("custom-title");
+      const greetingLineEl = document.getElementById("greeting-line");
+      const bodyLineEl = document.getElementById("body-line");
+      const signatureLineEl = document.getElementById("signature-line");
+      const generatedLinkInput = document.getElementById("generated-link");
+      const musicFileEl = document.getElementById("music-file");
+      const fileStatusEl = document.getElementById("file-status");
+      const generateBtn = document.getElementById("generate-btn");
+      const loadingIndicator = document.getElementById("loading-indicator");
+      const paperEl = document.querySelector(".paper");
+
+      // --- Logic Tải File lên Cloudinary (Chính) ---
+      async function uploadFileToCloudinary(file) {
+        if (
+          CLOUD_NAME === "your_cloud_name_here" ||
+          UPLOAD_PRESET === "unsigned_preset_name"
+        ) {
+          // alert thay bằng console.error để tránh lỗi trên iFrame
+          console.error(
+            "LỖI CẤU HÌNH: Vui lòng thay thế CLOUD_NAME và UPLOAD_PRESET trong mã nguồn."
+          );
+          return null;
+        }
+
+        if (file.size > MUSIC_MAX_SIZE) {
+          console.error(
+            `Tệp nhạc quá lớn (${(file.size / (1024 * 1024)).toFixed(
+              1
+            )}MB). Vui lòng chọn tệp dưới 5MB.`
+          );
+          return null;
+        }
+
+        const url = `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/auto/upload`;
+        const formData = new FormData();
+        formData.append("file", file);
+        formData.append("upload_preset", UPLOAD_PRESET);
+
+        isUploading = true;
+        generateBtn.disabled = true;
+        loadingIndicator.classList.remove("hidden");
+        fileStatusEl.textContent = `🔊 Đang tải lên: ${file.name}...`;
+
+        try {
+          const response = await fetch(url, {
+            method: "POST",
+            body: formData,
+          });
+
+          const data = await response.json();
+
+          isUploading = false;
+          generateBtn.disabled = false;
+          loadingIndicator.classList.add("hidden");
+
+          if (data.secure_url) {
+            fileStatusEl.textContent = `✅ Tải lên thành công! URL: ${data.secure_url.substring(
+              0,
+              40
+            )}...`;
+            fileStatusEl.classList.remove("text-red-500");
+            fileStatusEl.classList.add("text-green-600");
+            return data.secure_url;
+          } else {
+            console.error("Cloudinary upload error:", data);
+            fileStatusEl.textContent =
+              "❌ Lỗi tải lên. Vui lòng thử lại hoặc kiểm tra cấu hình.";
+            fileStatusEl.classList.add("text-red-500");
+            return null;
+          }
+        } catch (error) {
+          console.error("Lỗi kết nối Cloudinary:", error);
+          isUploading = false;
+          generateBtn.disabled = false;
+          loadingIndicator.classList.add("hidden");
+          fileStatusEl.textContent =
+            "❌ Lỗi kết nối. Vui lòng kiểm tra internet.";
+          fileStatusEl.classList.add("text-red-500");
+          return null;
+        }
+      }
+
+      // --- Logic Tạo Link (Generator Mode) ---
+      async function handleLinkGeneration() {
+        const musicFile = musicFileEl.files[0];
+        const musicUrlVal = document.getElementById("music-url").value.trim();
+        let finalMusicUrl = musicUrlVal;
+
+        // 1. Kiểm tra nội dung bắt buộc
+        const titleVal = document.getElementById("title").value;
+        const recipientVal = document.getElementById("recipient").value;
+        const messageVal = document.getElementById("message").value;
+        const conclusionVal = document.getElementById("conclusion").value;
+        const senderVal = document.getElementById("sender").value;
+
+        if (
+          !titleVal ||
+          !recipientVal ||
+          !messageVal ||
+          !conclusionVal ||
+          !senderVal
+        ) {
+          console.error(
+            "Vui lòng nhập đầy đủ Tiêu đề, Lời chào, Nội dung, Lời kết và Chữ ký."
+          );
+          return;
+        }
+
+        // 2. Xử lý tải file nếu có
+        if (musicFile) {
+          if (isUploading) {
+            console.warn("Đang tải file lên Cloudinary, vui lòng chờ...");
+            return;
+          }
+          finalMusicUrl = await uploadFileToCloudinary(musicFile);
+          if (!finalMusicUrl) {
+            // Upload thất bại hoặc lỗi cấu hình
+            return;
+          }
+        }
+
+        // 3. Tạo Link
+        generateLink(
+          titleVal,
+          recipientVal,
+          messageVal,
+          conclusionVal,
+          senderVal,
+          finalMusicUrl
+        );
+      }
+
+      function generateLink(
+        titleVal,
+        recipientVal,
+        messageVal,
+        conclusionVal,
+        senderVal,
+        musicUrl
+      ) {
+        // Lấy đường dẫn gốc của trang
+        const baseUrl = window.location.href.split("?")[0];
+
+        // Mã hóa các tham số
+        const params = new URLSearchParams();
+        params.append("t", titleVal);
+        params.append("to", recipientVal);
+        params.append("msg", messageVal.replace(/\n/g, "\n")); // Giữ lại \n
+        params.append("con", conclusionVal);
+        params.append("from", senderVal);
+
+        if (musicUrl) {
+          params.append("music", musicUrl); // Dùng URL từ Cloudinary hoặc URL trực tiếp
+        }
+
+        const finalLink = `${baseUrl}?${params.toString()}`;
+
+        // Hiển thị kết quả
+        document.getElementById("result-container").classList.remove("hidden");
+        generatedLinkInput.value = finalLink;
+        document.getElementById("test-link").href = finalLink;
+
+        // Cuộn xuống để người dùng thấy link
+        generatorUI.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+
+      function copyLink() {
+        generatedLinkInput.select();
+        document.execCommand("copy"); // Sao chép vào clipboard
+
+        const msg = document.getElementById("copy-message");
+        msg.classList.add("opacity-100");
+        setTimeout(() => {
+          msg.classList.remove("opacity-100");
+        }, 1500);
+      }
+
+      // --- Hàm Tiện Ích (Xử lý Tham số URL) ---
+      function getUrlParameter(name) {
+        name = name.replace(/[\[]/, "\\[").replace(/[\]]/, "\\]");
+        const regex = new RegExp("[\\?&]" + name + "=([^&#]*)");
+        const results = regex.exec(location.search);
+        return results === null
+          ? ""
+          : decodeURIComponent(results[1].replace(/\+/g, " "));
+      }
+
+      // --- Áp dụng Nội dung Tùy chỉnh (View Mode) ---
+      function applyCustomContent() {
+        const customTitle = getUrlParameter("t");
+        const customTo = getUrlParameter("to");
+        const customMsg = getUrlParameter("msg");
+        const customCon = getUrlParameter("con"); // Lời kết mới
+        const customFrom = getUrlParameter("from");
+        const customMusicUrl = getUrlParameter("music"); // Dùng URL từ Cloudinary
+
+        let isCustomLink = false;
+
+        // 1. Update Title
+        if (customTitle) {
+          customTitleEl.textContent = customTitle;
+          document.title = customTitle;
+          isCustomLink = true;
+        }
+
+        // 2. Update Greeting (First line)
+        if (customTo) {
+          const newGreeting = `Gửi ${customTo},`;
+          greetingLineEl.setAttribute("data-text", newGreeting);
+          isCustomLink = true;
+        }
+
+        // 3. Update Body (Second line)
+        if (customMsg) {
+          const cleanMsg = customMsg.replace(/<br\s*\/?>/gi, "\n");
+          bodyLineEl.setAttribute("data-text", cleanMsg);
+          isCustomLink = true;
+        }
+
+        // 4. Update Signature (Last line)
+        if (customCon && customFrom) {
+          const newSignature = `${customCon}<br>${customFrom}`;
+          signatureLineEl.setAttribute("data-text", newSignature);
+          signatureLineEl.innerHTML = newSignature;
+          isCustomLink = true;
+        } else if (customFrom) {
+          const defaultCon = getUrlParameter("con") || "Yêu thương nhất,";
+          const newSignature = `${defaultCon}<br>${customFrom}`;
+          signatureLineEl.setAttribute("data-text", newSignature);
+          signatureLineEl.innerHTML = newSignature;
+          isCustomLink = true;
+        }
+
+        // 5. Update Music (Dùng URL từ tham số music)
+        if (customMusicUrl) {
+          music.innerHTML = `<source src="${customMusicUrl}" type="audio/mpeg" onerror="console.error('Lỗi tải nhạc: Không tìm thấy hoặc định dạng không hỗ trợ.');">`;
+          music.load(); // Tải nhạc mới
+          isCustomLink = true;
+        }
+
+        // 6. Ẩn Generator và Hiện Phong Thư nếu đây là Link đã tạo
+        if (isCustomLink) {
+          document.body.classList.add("is-custom-link");
+        }
+      }
+
+      // --- Khởi tạo ---
+      applyCustomContent();
+
+      // --- Các hàm Envelope và Typewriter (Giữ nguyên) ---
+
+      function createHeart() {
+        const container = document.getElementById("hearts-container");
+        const heart = document.createElement("div");
+        heart.classList.add("bg-heart");
+
+        const left = Math.random() * 100;
+        const duration = Math.random() * 5 + 5;
+
+        heart.innerHTML = '<i class="fa-solid fa-heart"></i>';
+        heart.style.left = left + "vw";
+        heart.style.animationDuration = duration + "s";
+
+        container.appendChild(heart);
+
+        setTimeout(() => {
+          heart.remove();
+        }, duration * 1000);
+      }
+
+      // Chỉ tạo hiệu ứng tim bay khi ở chế độ xem link
+      if (document.body.classList.contains("is-custom-link")) {
+        setInterval(createHeart, 600);
+      }
+
+      function openEnvelope() {
+        if (isEnvelopeOpen) return;
+
+        isEnvelopeOpen = true;
+
+        const wrapper = document.querySelector(".envelope-wrapper");
+        wrapper.classList.add("open");
+
+        letterPreview.classList.remove("in-pocket");
+
+        playMusic();
+      }
+
+      function resetTyping() {
+        if (typingTimeoutId) {
+          clearTimeout(typingTimeoutId);
+          typingTimeoutId = null;
+        }
+        isTyping = false;
+
+        letterLines.forEach((line) => {
+          const originalText = line.getAttribute("data-text");
+          // Khôi phục nội dung tĩnh (không có hiệu ứng) để tránh lỗi nếu người dùng đóng thư nhanh
+          line.innerHTML = originalText.replace(/\n/g, "<br>");
+          line.style.opacity = "0";
+        });
+      }
+
+      function typeLine(element, text) {
+        return new Promise((resolve) => {
+          if (!isTyping || fullLetter.classList.contains("show") === false) {
+            resolve();
+            return;
+          }
+
+          let i = 0;
+          element.innerHTML = "";
+          element.style.opacity = "1";
+
+          function typeChar() {
+            if (!isTyping || fullLetter.classList.contains("show") === false) {
+              resolve();
+              return;
+            }
+
+            if (i < text.length) {
+              const char = text.charAt(i);
+
+              if (text.substring(i, i + 4) === "<br>") {
+                // Xử lý thẻ <br> (ví dụ: trong chữ ký)
+                element.innerHTML += "<br>";
+                i += 4;
+              } else if (text.substring(i, i + 1) === "\n") {
+                // Xử lý xuống dòng (\n) cho nội dung thân thư
+                element.innerHTML += "<br>";
+                i += 1;
+              } else {
+                element.innerHTML += char;
+                i++;
+              }
+
+              typingTimeoutId = setTimeout(typeChar, TYPING_SPEED);
+            } else {
+              resolve();
+            }
+          }
+
+          typeChar();
+        });
+      }
+
+      async function startTyping(lines) {
+        if (isTyping) return;
+        isTyping = true;
+
+        for (let i = 0; i < lines.length; i++) {
+          if (!isTyping || fullLetter.classList.contains("show") === false)
+            break;
+
+          const line = lines[i];
+          const originalText = line.getAttribute("data-text");
+
+          await typeLine(line, originalText);
+
+          if (isTyping && i < lines.length - 1) {
+            await new Promise((resolve) => {
+              typingTimeoutId = setTimeout(resolve, 500);
+            });
+          }
+        }
+        if (isTyping) {
+          isTyping = false;
+        }
+      }
+
+      function showFullLetter(e) {
+        e.stopPropagation();
+
+        if (isEnvelopeOpen) {
+          fullLetter.classList.add("show");
+
+          // Đảm bảo tất cả chữ bị ẩn trước khi type
+          letterLines.forEach((line) => {
+            line.style.opacity = "0";
+            line.innerHTML = "";
+          });
+
+          // Bắt đầu hiệu ứng đánh máy
+          startTyping(letterLines);
+        }
+      }
+
+      // --- Đã tối ưu hóa: Chỉ ẩn popup và reset typing ---
+      function hideFullLetter() {
+        fullLetter.classList.remove("show");
+        resetTyping();
+      }
+
+      // Gắn sự kiện click vào vùng tối (để đóng thư)
+      fullLetter.addEventListener("click", (e) => {
+        // Chỉ đóng khi click trực tiếp vào #full-letter (vùng tối)
+        if (e.target.id === "full-letter") {
+          hideFullLetter();
+        }
+      });
+
+      // --- Logic Lướt/Vuốt (Swiping UI cho Mobile) ---
+      let startY = 0;
+      const SWIPE_THRESHOLD = 100; // Ngưỡng vuốt xuống để đóng (pixels)
+
+      paperEl.addEventListener("touchstart", (e) => {
+        // Chỉ bắt đầu vuốt nếu là chạm đơn
+        if (e.touches.length === 1) {
+          startY = e.touches[0].clientY;
+          paperEl.style.transition = "none"; // Tắt transition khi đang vuốt
+        }
+      });
+
+      paperEl.addEventListener("touchmove", (e) => {
+        // Ngăn chặn cuộn trang mặc định khi vuốt
+        if (e.touches.length === 1) {
+          const currentY = e.touches[0].clientY;
+          const deltaY = currentY - startY;
+
+          if (deltaY > 0) {
+            // Chỉ cho phép vuốt xuống
+            e.preventDefault();
+            // Di chuyển giấy theo ngón tay
+            paperEl.style.transform = `translateY(${deltaY}px) scale(1)`;
+          }
+        }
+      });
+
+      paperEl.addEventListener("touchend", (e) => {
+        // Khôi phục transition để đóng/đưa về vị trí cũ mượt mà
+        paperEl.style.transition =
+          "transform 0.3s cubic-bezier(0.16, 1, 0.3, 1)";
+
+        if (e.changedTouches.length === 1) {
+          const endY = e.changedTouches[0].clientY;
+          const deltaY = endY - startY;
+
+          if (deltaY > SWIPE_THRESHOLD) {
+            // Đạt ngưỡng: Đóng thư
+
+            // Tạo hiệu ứng trượt ra ngoài
+            paperEl.style.transform = `translateY(${window.innerHeight}px) scale(1)`;
+
+            // Sau khi trượt, ẩn popup và reset vị trí cho lần mở tiếp theo
+            setTimeout(() => {
+              hideFullLetter(); // Gọi hàm ẩn thư đã tối ưu
+              paperEl.style.transition = "transform 0.5s ease"; // Dùng lại transition mặc định khi mở
+              paperEl.style.transform = "scale(1)"; // Reset vị trí cho lần mở sau
+            }, 300);
+          } else {
+            // Không đạt ngưỡng: Đưa giấy về vị trí cũ (ở giữa)
+            paperEl.style.transform = "scale(1)";
+          }
+        }
+      });
+
+      // --- Logic Nhạc ---
+      let isPlaying = false;
+
+      function toggleMusic() {
+        if (isPlaying) {
+          music.pause();
+          isPlaying = false;
+          musicIcon.classList.remove("fa-volume-high", "note-anim");
+          musicIcon.classList.add("fa-volume-xmark");
+        } else {
+          playMusic();
+        }
+      }
+
+      function playMusic() {
+        music
+          .play()
+          .then(() => {
+            isPlaying = true;
+            musicIcon.classList.remove("fa-volume-xmark");
+            musicIcon.classList.add("fa-volume-high", "note-anim");
+          })
+          .catch((error) => {
+            console.log(
+              "Trình duyệt chặn auto-play, cần tương tác người dùng trước."
+            );
+          });
+      }
+    </script>
+  </body>
+</html>
