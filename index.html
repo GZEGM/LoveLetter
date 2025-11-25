@@ -1,0 +1,690 @@
+<!DOCTYPE html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Gửi người thương</title>
+    <!-- Google Fonts cho chữ viết tay đẹp -->
+    <link
+      href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@400;700&family=Nunito:wght==400;600&display=swap"
+      rel="stylesheet"
+    />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/js/all.min.js"></script>
+    <style>
+      /* --- Cấu hình chung --- */
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        height: 100vh;
+        width: 100vw;
+        /* Background gradient hồng nhẹ pastel */
+        background-color: #f7a2b9;
+        background-image: linear-gradient(135deg, #fce4ec 0%, #f7a2b9 100%);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        overflow: hidden;
+        font-family: "Nunito", sans-serif;
+        position: relative;
+      }
+
+      /* --- Hiệu ứng tim bay nền (Background Particles) --- */
+      .bg-heart {
+        position: absolute;
+        top: -10vh;
+        background: rgba(255, 255, 255, 0.6);
+        backdrop-filter: blur(2px);
+        border-radius: 50%;
+        pointer-events: none;
+        animation: fall linear infinite;
+      }
+
+      @keyframes fall {
+        0% {
+          transform: translateY(-10vh) translateX(0) rotate(0deg);
+          opacity: 1;
+        }
+        100% {
+          transform: translateY(110vh) translateX(20px) rotate(360deg);
+          opacity: 0;
+        }
+      }
+
+      /* --- Khối Phong Thư (Envelope) --- */
+      .envelope-wrapper {
+        position: relative;
+        cursor: pointer;
+        transition: transform 0.3s;
+        perspective: 1000px; /* Thêm perspective cho hiệu ứng lật 3D */
+      }
+
+      .envelope-wrapper:hover {
+        transform: scale(1.02);
+      }
+
+      .envelope {
+        position: relative;
+        width: 300px;
+        height: 200px;
+        background: #ffcdd2; /* Màu nền thân sau phong bì (Hồng nhạt hơn) */
+        border-radius: 8px;
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+        z-index: 20; /* Z-index cao để nằm trên lá thư khi mở */
+        transition: background 0.5s;
+      }
+
+      /* Phần túi/thân phong bì phía dưới (Góc tam giác đậm hơn) */
+      .envelope::after {
+        content: "";
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        width: 0;
+        height: 0;
+        border-left: 150px solid transparent;
+        border-right: 150px solid transparent;
+        border-bottom: 100px solid #f06292; /* Màu tam giác đáy (Hồng đậm) */
+        border-radius: 0 0 8px 8px;
+        z-index: 20; /* Cùng z-index với thân phong bì để tạo cảm giác là một khối */
+        pointer-events: none;
+        transition: border-bottom-color 0.5s;
+      }
+
+      /* Phần thân 2 bên (Màu hồng nhạt) - Giúp lá thư có thể trồi lên qua khe */
+      .envelope::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 300px;
+        height: 200px;
+        background: #ffcdd2; /* Cùng màu nền thân phong bì */
+        z-index: 20;
+        pointer-events: none;
+        border-radius: 8px;
+        transition: background 0.5s;
+      }
+
+      /* Lá thư bên trong (Preview) */
+      .letter-preview {
+        position: absolute;
+        width: 270px;
+        height: 140px;
+        background: white;
+        border-radius: 5px;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+        z-index: 5; /* Z-index thấp khi đóng */
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        flex-direction: column;
+        transition: transform 0.8s ease-in-out, z-index 0.1s, opacity 0.5s; /* Thêm opacity vào transition */
+      }
+
+      /* Định vị lá thư khi đang ĐÓNG (nằm hoàn toàn trong phong bì) */
+      .letter-preview.in-pocket {
+        /* Lá thư nằm sâu hơn */
+        top: 90px;
+        left: 15px;
+        opacity: 0; /* QUAN TRỌNG: ẨN hoàn toàn lá thư khi đóng */
+        z-index: 25; /* Nằm dưới nắp (30), trên thân (20) */
+      }
+
+      .letter-preview .heart-seal {
+        font-size: 30px;
+        color: #ffcdd2; /* Màu hồng nhạt */
+        opacity: 1;
+      }
+
+      /* Nắp phong bì (Flap) - Nằm trên cùng, là tam giác lật (Màu hồng đậm) */
+      .flap {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 0;
+        height: 0;
+        border-left: 150px solid transparent;
+        border-right: 150px solid transparent;
+        border-top: 120px solid #f06292; /* Kích thước nắp để che phủ */
+        transform-origin: top;
+        transition: transform 0.6s 0.4s ease-in-out;
+        z-index: 30; /* Nắp nằm trên cùng khi đóng */
+        border-top-left-radius: 8px;
+        border-top-right-radius: 8px;
+      }
+
+      /* Tem niêm phong - Trái tim nhỏ (Màu đỏ) */
+      .seal {
+        position: absolute;
+        /* Tem dịch lên trên để nằm trên nắp và thân */
+        top: 110px;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 20px;
+        height: 20px;
+        background: #d32f2f; /* Màu đỏ */
+        border-radius: 50%;
+        z-index: 40; /* Z-index cao nhất khi đóng */
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        color: white;
+        font-size: 10px;
+        cursor: pointer;
+        transition: opacity 0.4s 0.2s, transform 0.3s;
+      }
+
+      .seal i {
+        font-size: 10px;
+      }
+
+      /* --- Trạng thái MỞ (Animation Classes) --- */
+      .envelope-wrapper.open .flap {
+        transform: rotateX(180deg); /* Lật 180 độ ra phía sau */
+        z-index: 1; /* Nắp lật ra sau lá thư và thân phong bì */
+      }
+
+      .envelope-wrapper.open .seal {
+        opacity: 0;
+        pointer-events: none;
+      }
+
+      /* Định vị lá thư khi đang MỞ (trồi lên) */
+      .envelope-wrapper.open .letter-preview {
+        top: 10px; /* Vị trí kết thúc trồi lên */
+        left: 15px;
+        opacity: 1; /* HIỆN lá thư khi mở */
+        cursor: pointer;
+        z-index: 15; /* Nằm dưới Thân phong bì (20) và trên Nắp lật (1) */
+        /* Animation trồi lên, bắt đầu từ vị trí đóng (top: 90px) */
+        animation: letter-pop 0.8s 0.5s ease-in-out forwards;
+      }
+
+      @keyframes letter-pop {
+        0% {
+          transform: translateY(0);
+          opacity: 1;
+        }
+        60% {
+          transform: translateY(-110px);
+        }
+        100% {
+          transform: translateY(-80px);
+        } /* Độ chồi lên: 90px (top đóng) - 10px (top mở) = 80px */
+      }
+
+      .envelope-wrapper.open .letter-preview:hover {
+        transform: translateY(-85px); /* Điều chỉnh hover */
+        box-shadow: 0 -5px 10px rgba(0, 0, 0, 0.1);
+      }
+
+      /* Hiệu ứng nắp sau khi mở - chỉ còn phần tam giác nhỏ */
+      .envelope-wrapper.open .flap {
+        /* Giữ nguyên transform: rotateX(180deg) */
+      }
+
+      /* --- Giao diện Đọc thư (Full Screen) --- */
+      #full-letter {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.6);
+        z-index: 100;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.3s ease;
+      }
+
+      #full-letter.show {
+        opacity: 1;
+        pointer-events: auto;
+      }
+
+      .paper {
+        width: 90%;
+        max-width: 400px;
+        height: 80vh;
+        background: #fffafa;
+        border-radius: 10px;
+        box-shadow: 0 0 20px rgba(255, 255, 255, 0.4);
+        padding: 25px;
+        position: relative;
+        overflow-y: auto;
+        overflow-x: hidden; /* QUAN TRỌNG: Ngăn cuộn ngang khi type */
+        transform: scale(0.8);
+        transition: transform 0.5s ease;
+
+        /* Tạo dòng kẻ giấy */
+        background-image: repeating-linear-gradient(
+          white 0px,
+          white 24px,
+          #e1e1e1 25px
+        );
+        line-height: 25px;
+      }
+
+      #full-letter.show .paper {
+        transform: scale(1);
+      }
+
+      /* Ẩn thanh cuộn nhưng vẫn cuộn được */
+      .paper::-webkit-scrollbar {
+        width: 0px;
+        background: transparent;
+      }
+
+      .paper-content {
+        margin-top: 10px;
+      }
+
+      .paper h2 {
+        font-family: "Dancing Script", cursive;
+        text-align: center;
+        color: #d62828;
+        font-size: 28px;
+        margin-bottom: 20px;
+        line-height: 1.2;
+      }
+
+      /* Chữ của thư - ẩn ban đầu */
+      .paper p,
+      .signature {
+        font-family: "Nunito", sans-serif;
+        color: #4a4a4a;
+        font-size: 16px;
+        text-align: justify;
+        margin-bottom: 15px;
+        white-space: pre-wrap;
+        opacity: 0;
+        display: block;
+        /* width/animation đã được loại bỏ để chuyển sang JS */
+        transition: opacity 0.1s;
+      }
+
+      .signature {
+        font-family: "Dancing Script", cursive;
+        text-align: right;
+        font-size: 24px;
+        margin-top: 30px;
+        color: #d62828;
+      }
+
+      /* --- Hiệu ứng Typewriter (Chữ xuất hiện dần) --- */
+      /* Đã loại bỏ CSS animation */
+
+      /* --- Audio Control --- */
+      .music-control {
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        z-index: 200;
+        background: white;
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        cursor: pointer;
+        color: #f06292;
+      }
+
+      .note-anim {
+        animation: musicRotate 2s linear infinite;
+      }
+
+      @keyframes musicRotate {
+        0% {
+          transform: rotate(0deg) scale(1);
+        }
+        50% {
+          transform: rotate(180deg) scale(1.2);
+        }
+        100% {
+          transform: rotate(360deg) scale(1);
+        }
+      }
+
+      /* Mobile specific adjustments */
+      @media (max-width: 480px) {
+        .envelope {
+          width: 260px;
+          height: 170px;
+        }
+        .flap {
+          border-left-width: 130px;
+          border-right-width: 130px;
+          border-top-width: 105px; /* Điều chỉnh cho mobile */
+        }
+        .envelope::after {
+          border-left-width: 130px;
+          border-right-width: 130px;
+          border-bottom-width: 85px;
+        }
+        .envelope::before {
+          width: 260px;
+          height: 170px;
+        }
+        .letter-preview {
+          width: 230px;
+          height: 120px;
+        }
+        .letter-preview.in-pocket {
+          top: 75px;
+          left: 15px;
+        }
+        .seal {
+          top: 95px;
+        } /* Điều chỉnh tem */
+        .paper {
+          max-width: 350px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <!-- Nhạc nền (Ẩn). Lưu ý: Bạn cần thay đổi đường dẫn "sound.m4a" hoặc "sound.mp3" bằng đường dẫn nhạc thực tế. -->
+    <audio id="bg-music" loop>
+      <source src="sound.m4a" type="audio/mp4" />
+      <source src="sound.mp3" type="audio/mpeg" />
+    </audio>
+
+    <!-- Nút điều khiển nhạc -->
+    <div class="music-control" onclick="toggleMusic()">
+      <i id="music-icon" class="fa-solid fa-volume-xmark"></i>
+    </div>
+
+    <!-- Hiệu ứng tim bay (JS sẽ tạo thêm) -->
+    <div id="hearts-container"></div>
+
+    <!-- Phong thư -->
+    <div class="envelope-wrapper" onclick="openEnvelope()">
+      <div class="envelope">
+        <!-- Lá thư bên trong (Preview) -->
+        <div
+          id="letter-preview"
+          class="letter-preview in-pocket"
+          onclick="showFullLetter(event)"
+        >
+          <i class="fa-solid fa-heart heart-seal"></i>
+        </div>
+
+        <!-- Nắp phong bì (Phải là một thẻ riêng để lật) -->
+        <div class="flap"></div>
+
+        <!-- Tem trái tim khóa phong bì -->
+        <div class="seal">
+          <i class="fa-solid fa-heart"></i>
+        </div>
+      </div>
+    </div>
+
+    <!-- Nội dung thư đầy đủ (Popup) -->
+    <div id="full-letter" onclick="hideFullLetter(event)">
+      <div class="paper" onclick="event.stopPropagation()">
+        <div class="paper-content">
+          <h2>Love Letter</h2>
+
+          <!-- QUAN TRỌNG: Các dòng chữ đều có class letter-line và data-text chứa nội dung đầy đủ -->
+          <p class="letter-line" data-text="Gửi ông xã iu,">Gửi ông xã iu,</p>
+
+          <p
+            class="letter-line"
+            data-text="Hôm nay không phải dịp gì đặc biệt cả, nhưng em chỉ muốn tặng anh một món quà nho nhỏ này."
+          >
+            Hôm nay không phải dịp gì đặc biệt cả, nhưng em chỉ muốn tặng anh
+            một món quà nho nhỏ này.
+          </p>
+
+          <p
+            class="letter-line"
+            data-text="Em tặng anh chiếc ví này, không phải vì nó sang hay đẹp, mà vì em muốn anh có thứ gì đó của em bên mình mỗi ngày, em mong rằng chiếc ví này sẽ mang lại thật nhiều may mắn và tài lộc cho anh trong công việc và cuộc sống, mỗi khi mở ví, đừng nghĩ gì quá to tát, chỉ cần nhớ rằng em đang nghĩ về anh và dù khoảng cách có xa, em vẫn muốn anh cảm thấy một chút ấm áp, mong anh giữ gìn sức khoẻ, giữ bình yên trong lòng, và luôn nhớ rằng em đang đợi anh, yêu anh hơn từng ngày. Chúc anh mỗi ngày đều may mắn hơn hôm qua, hạnh phúc hơn hôm kia và được yêu nhiều hơn bất cứ ngày nào trước đó."
+          >
+            Em tặng anh chiếc ví này, không phải vì nó sang hay đẹp, mà vì em
+            muốn anh có thứ gì đó của em bên mình mỗi ngày, em mong rằng chiếc
+            ví này sẽ mang lại thật nhiều may mắn và tài lộc cho anh trong công
+            việc và cuộc sống, mỗi khi mở ví, đừng nghĩ gì quá to tát, chỉ cần
+            nhớ rằng em đang nghĩ về anh và dù khoảng cách có xa, em vẫn muốn
+            anh cảm thấy một chút ấm áp, mong anh giữ gìn sức khoẻ, giữ bình yên
+            trong lòng, và luôn nhớ rằng em đang đợi anh, yêu anh hơn từng ngày.
+            Chúc anh mỗi ngày đều may mắn hơn hôm qua, hạnh phúc hơn hôm kia và
+            được yêu nhiều hơn bất cứ ngày nào trước đó.
+          </p>
+
+          <p
+            class="letter-line"
+            data-text="Hãy dùng chiếc ví này để giữ gìn mọi thứ ngăn nắp nhé, giống như cách em muốn giữ gìn và trân trọng mối quan hệ của chúng ta vậy."
+          >
+            Hãy dùng chiếc ví này để giữ gìn mọi thứ ngăn nắp nhé, giống như
+            cách em muốn giữ gìn và trân trọng mối quan hệ của chúng ta vậy.
+          </p>
+
+          <div
+            class="signature letter-line"
+            data-text="Gửi người em thương,<br>Mộng Tuyền"
+          >
+            Gửi người em thương,<br />
+            Mộng Tuyền
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      // --- Cấu hình chung ---
+      const TYPING_SPEED = 30; // ms per character (Điều chỉnh chậm hơn một chút để dễ đọc)
+      let isEnvelopeOpen = false;
+      let isTyping = false;
+      let typingTimeoutId = null;
+
+      const music = document.getElementById("bg-music");
+      const musicIcon = document.getElementById("music-icon");
+      const fullLetter = document.getElementById("full-letter");
+      const letterLines = document.querySelectorAll(".letter-line");
+      const letterPreview = document.getElementById("letter-preview");
+
+      // --- Tạo hiệu ứng tim bay ---
+      function createHeart() {
+        const container = document.getElementById("hearts-container");
+        const heart = document.createElement("div");
+        heart.classList.add("bg-heart");
+
+        // Random vị trí và kích thước
+        const left = Math.random() * 100;
+        const size = Math.random() * 20 + 10; // 10px - 30px
+        const duration = Math.random() * 5 + 5; // 5s - 10s
+
+        // Random hình dạng (dùng ký tự trái tim)
+        heart.innerHTML =
+          '<i class="fa-solid fa-heart" style="color: #ffcdd2;"></i>'; /* Màu hồng nhạt */
+        heart.style.fontSize = size + "px";
+
+        heart.style.left = left + "vw";
+        heart.style.animationDuration = duration + "s";
+
+        container.appendChild(heart);
+
+        // Xóa tim sau khi bay xong để nhẹ máy
+        setTimeout(() => {
+          heart.remove();
+        }, duration * 1000);
+      }
+
+      setInterval(createHeart, 600);
+
+      // --- Logic Mở thư (Envelope) ---
+      function openEnvelope() {
+        if (isEnvelopeOpen) return;
+
+        isEnvelopeOpen = true;
+
+        // 1. Animation mở phong bì (nắp mở, thư trồi lên)
+        const wrapper = document.querySelector(".envelope-wrapper");
+        wrapper.classList.add("open");
+
+        // QUAN TRỌNG: Loại bỏ class in-pocket và thêm opacity: 1 trong class open
+        letterPreview.classList.remove("in-pocket");
+
+        // 2. Tự động bật nhạc nếu chưa bật
+        playMusic();
+      }
+
+      // --- Logic Đọc thư (Full Letter) ---
+
+      // Hàm dừng và reset Typewriter
+      function resetTyping() {
+        if (typingTimeoutId) {
+          clearTimeout(typingTimeoutId);
+          typingTimeoutId = null;
+        }
+        isTyping = false;
+
+        // Hiển thị nội dung đầy đủ (ẩn opacity)
+        letterLines.forEach((line) => {
+          const originalText = line.getAttribute("data-text");
+          line.innerHTML = originalText;
+          line.style.opacity = "0"; // Ẩn lại để lần sau type lại
+        });
+      }
+
+      // Hàm Typewriter (Đánh máy) - Sử dụng Promise để đảm bảo tuần tự (Từng KÝ TỰ)
+      function typeLine(element, text) {
+        return new Promise((resolve) => {
+          // Kiểm tra lại trạng thái trước khi bắt đầu type
+          if (!isTyping || fullLetter.classList.contains("show") === false) {
+            resolve();
+            return;
+          }
+
+          // NEW: Character-by-Character logic
+          let i = 0;
+          element.innerHTML = ""; // Bắt đầu với nội dung rỗng
+          element.style.opacity = "1"; // Hiện element
+
+          function typeChar() {
+            // Dừng nếu bị reset hoặc popup bị đóng
+            if (!isTyping || fullLetter.classList.contains("show") === false) {
+              resolve();
+              return;
+            }
+
+            if (i < text.length) {
+              const char = text.charAt(i);
+
+              // Xử lý thẻ <br> (Nếu có, ví dụ trong chữ ký)
+              if (text.substring(i, i + 4) === "<br>") {
+                element.innerHTML += "<br>";
+                i += 4; // Bỏ qua 4 ký tự của <br>
+              } else {
+                element.innerHTML += char;
+                i++;
+              }
+
+              // Lên lịch cho ký tự tiếp theo
+              typingTimeoutId = setTimeout(typeChar, TYPING_SPEED);
+            } else {
+              // Đã xong dòng
+              resolve();
+            }
+          }
+
+          typeChar(); // Bắt đầu đánh máy
+        });
+      }
+
+      // Bắt đầu type từng dòng (Tuần tự)
+      async function startTyping(lines) {
+        if (isTyping) return;
+        isTyping = true;
+
+        for (let i = 0; i < lines.length; i++) {
+          if (!isTyping || fullLetter.classList.contains("show") === false)
+            break; // Dừng nếu bị reset hoặc popup bị đóng
+
+          const line = lines[i];
+          const originalText = line.getAttribute("data-text");
+
+          // Type dòng hiện tại và chờ xong
+          await typeLine(line, originalText);
+
+          // Nghỉ giữa các đoạn
+          if (isTyping && i < lines.length - 1) {
+            await new Promise((resolve) => {
+              typingTimeoutId = setTimeout(resolve, 500); // Nghỉ 0.5s giữa các đoạn văn
+            });
+          }
+        }
+        if (isTyping) {
+          isTyping = false;
+        }
+      }
+
+      // Hiện nội dung thư
+      function showFullLetter(e) {
+        e.stopPropagation();
+
+        if (isEnvelopeOpen) {
+          fullLetter.classList.add("show");
+
+          // Đảm bảo tất cả chữ bị ẩn trước khi type
+          letterLines.forEach((line) => {
+            line.style.opacity = "0";
+            line.innerHTML = ""; // Bắt đầu bằng nội dung rỗng
+          });
+
+          // Bắt đầu hiệu ứng đánh máy
+          startTyping(letterLines);
+        }
+      }
+
+      // Ẩn nội dung thư khi click ra ngoài
+      function hideFullLetter(e) {
+        if (e.target.id === "full-letter") {
+          fullLetter.classList.remove("show");
+
+          // Gọi hàm reset để dừng type và khôi phục trạng thái
+          resetTyping();
+        }
+      }
+
+      // --- Logic Nhạc ---
+      let isPlaying = false;
+
+      function toggleMusic() {
+        if (isPlaying) {
+          music.pause();
+          isPlaying = false;
+          musicIcon.classList.remove("fa-volume-high", "note-anim");
+          musicIcon.classList.add("fa-volume-xmark");
+        } else {
+          playMusic();
+        }
+      }
+
+      function playMusic() {
+        music
+          .play()
+          .then(() => {
+            isPlaying = true;
+            musicIcon.classList.remove("fa-volume-xmark");
+            musicIcon.classList.add("fa-volume-high", "note-anim");
+          })
+          .catch((error) => {
+            console.log(
+              "Trình duyệt chặn auto-play, cần tương tác người dùng trước."
+            );
+          });
+      }
+    </script>
+  </body>
+</html>
