@@ -3,16 +3,182 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Gửi Người Thương | Link Tùy Chỉnh Toàn Bộ</title>
-    <!-- Tailwind CSS CDN cho styling hiện đại -->
+    <title>Gửi Người Thương - Admin</title>
+    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Fonts -->
     <link
       href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@400;700&family=Nunito:wght@400;600&display=swap"
       rel="stylesheet"
     />
+    <!-- FontAwesome -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/js/all.min.js"></script>
+
+    <!-- Firebase SDKs (Modular) -->
+    <script type="module">
+      import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-app.js";
+      // Import Realtime Database
+      import {
+        getDatabase,
+        ref,
+        push,
+        set,
+        get,
+        child,
+      } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-database.js";
+      import {
+        getAuth,
+        signInAnonymously,
+        signInWithCustomToken,
+        onAuthStateChanged,
+      } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-auth.js";
+
+      // --- Cấu hình Firebase ---
+      const firebaseConfig = {
+        apiKey: "AIzaSyBvMIS8IRDqyYOhMeIx5qXgHmt1ivXftzU",
+        authDomain: "loveletter-f0f23.firebaseapp.com",
+        databaseURL: "https://loveletter-f0f23-default-rtdb.firebaseio.com",
+        projectId: "loveletter-f0f23",
+        storageBucket: "loveletter-f0f23.firebasestorage.app",
+        messagingSenderId: "688584515488",
+        appId: "1:688584515488:web:e94a5646343464be134ec5",
+        measurementId: "G-1JF9CC55P5",
+      };
+      const appId =
+        typeof __app_id !== "undefined" ? __app_id : "default-app-id";
+
+      let currentUser = null;
+      let isAuthReady = false;
+      let isDomReady = false;
+      let db, auth;
+
+      try {
+        const app = initializeApp(firebaseConfig);
+        db = getDatabase(app);
+        auth = getAuth(app);
+        console.log("Firebase initialized successfully.");
+      } catch (error) {
+        console.error("Error initializing Firebase:", error);
+      }
+
+      // --- Hàm Lưu & Tải Dữ Liệu (Sử dụng RTDB) ---
+
+      // 1. Lưu thư lên Realtime Database
+      window.saveLetterToFirebase = async (data) => {
+        if (!currentUser) {
+          window.showCustomAlert(
+            "Đang kết nối đến máy chủ, vui lòng thử lại sau giây lát..."
+          );
+          return null;
+        }
+        try {
+          // Path: artifacts/{appId}/public/data/letters
+          const lettersRef = ref(db, `artifacts/${appId}/public/data/letters`);
+
+          const newLetterRef = push(lettersRef);
+
+          await set(newLetterRef, {
+            ...data,
+            createdAt: new Date().toISOString(),
+            uid: currentUser.uid,
+          });
+
+          return newLetterRef.key; // Trả về ID của thư
+        } catch (e) {
+          console.error("Lỗi lưu dữ liệu RTDB:", e);
+          window.showCustomAlert("Không thể lưu thư. Vui lòng thử lại.");
+          return null;
+        }
+      };
+
+      // 2. Tải thư từ Realtime Database (chủ yếu cho mục đích test/xem)
+      window.loadLetterFromFirebase = async (id) => {
+        if (!db) return null;
+        try {
+          const dbRef = ref(db);
+          // Lấy dữ liệu từ path cụ thể: artifacts/{appId}/public/data/letters/{id}
+          const snapshot = await get(
+            child(dbRef, `artifacts/${appId}/public/data/letters/${id}`)
+          );
+
+          if (snapshot.exists()) {
+            return snapshot.val();
+          } else {
+            return null;
+          }
+        } catch (e) {
+          console.error("Lỗi tải dữ liệu RTDB:", e);
+          return null;
+        }
+      };
+
+      // 3. Hàm kiểm tra URL VÀ tải dữ liệu (chỉ chạy khi DOM và Auth sẵn sàng)
+      async function checkUrlAndLoad() {
+        if (!isAuthReady || !isDomReady) return;
+
+        const urlParams = new URLSearchParams(window.location.search);
+        const letterId = urlParams.get("id");
+
+        if (letterId) {
+          const loadingOverlay = document.getElementById("loading-overlay");
+          if (loadingOverlay) {
+            loadingOverlay.classList.remove("hidden");
+          }
+
+          const data = await window.loadLetterFromFirebase(letterId);
+
+          if (loadingOverlay) {
+            loadingOverlay.classList.add("hidden");
+          }
+
+          if (data) {
+            window.applyDataToUI(data);
+            document.body.classList.add("view-mode");
+            window.showCustomAlert(
+              "Đang ở chế độ xem trước thư ID: " + letterId
+            );
+          } else {
+            window.showCustomAlert("Không tìm thấy lá thư này hoặc đã bị xoá!");
+          }
+        }
+      }
+
+      // Đăng nhập ẩn danh để có quyền ghi DB
+      const initAuth = async () => {
+        if (!auth) return;
+        try {
+          if (
+            typeof __initial_auth_token !== "undefined" &&
+            __initial_auth_token
+          ) {
+            await signInWithCustomToken(auth, __initial_auth_token);
+          } else {
+            await signInAnonymously(auth);
+          }
+        } catch (e) {
+          console.error("Auth failed, continuing anonymously:", e);
+        }
+      };
+      initAuth();
+
+      // Theo dõi trạng thái xác thực
+      onAuthStateChanged(auth, (user) => {
+        if (user) {
+          currentUser = user;
+        }
+        isAuthReady = true;
+        checkUrlAndLoad();
+      });
+
+      // Theo dõi trạng thái DOM load
+      document.addEventListener("DOMContentLoaded", () => {
+        isDomReady = true;
+        checkUrlAndLoad();
+      });
+    </script>
+
     <style>
-      /* --- Cấu hình Tailwind + Font chung --- */
+      /* --- CẤU HÌNH CSS ĐÃ CHỈNH SỬA VÀ ĐỒNG BỘ 100% VỚI letter.html --- */
       :root {
         --color-primary: #f06292; /* Hồng đậm */
         --color-secondary: #ffcdd2; /* Hồng nhạt */
@@ -22,57 +188,73 @@
         box-sizing: border-box;
       }
       body {
-        height: 100vh;
-        width: 100vw;
+        /* Cho phép cuộn tự do */
+        min-height: 100vh;
+        width: 100%;
         background-color: var(--color-bg);
         background-image: linear-gradient(135deg, #fce4ec 0%, #f7a2b9 100%);
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        overflow: hidden;
         font-family: "Nunito", sans-serif;
         position: relative;
-        transition: opacity 0.5s;
+        overflow-y: auto;
+        overflow-x: hidden;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        padding-bottom: 50px;
       }
-      /* Ẩn Generator khi xem Link đã tạo */
-      .is-custom-link #generator-ui {
+
+      /* --- Layout quản lý hiển thị --- */
+
+      /* Mặc định: Ẩn Envelope Container khi đang ở Generator mode (trừ khi bật preview) */
+      #envelope-container {
+        display: none;
+        width: 100%;
+        display: flex;
+        justify-content: center;
+        perspective: 1000px; /* Góc nhìn 3D */
+        z-index: 50;
+      }
+
+      /* Khi ở View Mode (xem link): Luôn hiện Envelope, Ẩn Generator */
+      body.view-mode #envelope-container {
+        display: flex !important;
+        /* Căn giữa dọc màn hình */
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        height: 100vh;
+        width: 100vw;
+        background: transparent;
+        margin-top: 0;
+      }
+      body.view-mode #generator-ui {
         display: none !important;
       }
-      /* Ẩn Envelope khi ở chế độ Generator */
-      #generator-ui:not(:hidden) ~ .envelope-wrapper {
-        display: none;
+
+      /* Khi bật Preview trong Generator: Hiện Envelope */
+      body.show-preview #envelope-container {
+        display: flex !important;
+        margin-top: 50px; /* Vị trí mặc định trên đầu */
+        animation: fadeIn 0.5s ease;
       }
 
-      /* --- Hiệu ứng tim bay nền (Background Particles) --- */
-      .bg-heart {
-        position: absolute;
-        top: -10vh;
-        background: rgba(255, 255, 255, 0.6);
-        backdrop-filter: blur(2px);
-        border-radius: 50%;
-        pointer-events: none;
-        animation: fall linear infinite;
-        font-size: 20px;
-        color: var(--color-secondary);
-      }
-      @keyframes fall {
-        0% {
-          transform: translateY(-10vh) translateX(0) rotate(0deg);
-          opacity: 1;
-        }
-        100% {
-          transform: translateY(110vh) translateX(20px) rotate(360deg);
+      @keyframes fadeIn {
+        from {
           opacity: 0;
+          transform: translateY(-20px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
         }
       }
 
-      /* --- Khối Phong Thư (Envelope) --- */
+      /* --- Khối Phong Thư (Envelope) (Giữ nguyên) --- */
       .envelope-wrapper {
         position: relative;
         cursor: pointer;
         transition: transform 0.3s;
-        perspective: 1000px;
-        z-index: 50;
       }
       .envelope-wrapper:hover {
         transform: scale(1.02);
@@ -85,9 +267,9 @@
         border-radius: 8px;
         box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
         z-index: 20;
-        transition: background 0.5s;
       }
       .envelope::after {
+        /* Đáy thư: phần dưới */
         content: "";
         position: absolute;
         bottom: 0;
@@ -100,9 +282,9 @@
         border-radius: 0 0 8px 8px;
         z-index: 20;
         pointer-events: none;
-        transition: border-bottom-color 0.5s;
       }
       .envelope::before {
+        /* Miệng thư: che phần trên cùng */
         content: "";
         position: absolute;
         top: 0;
@@ -113,9 +295,9 @@
         z-index: 20;
         pointer-events: none;
         border-radius: 8px;
-        transition: background 0.5s;
       }
       .letter-preview {
+        /* LÁ THƯ NHỎ NHÔ RA (VỊ TRÍ ĐÃ FIX) */
         position: absolute;
         width: 270px;
         height: 140px;
@@ -127,20 +309,16 @@
         justify-content: center;
         align-items: center;
         flex-direction: column;
-        transition: transform 0.8s ease-in-out, z-index 0.1s, opacity 0.5s;
-      }
-      .letter-preview.in-pocket {
-        top: 90px;
+        top: 90px; /* Vị trí mặc định */
         left: 15px;
-        opacity: 0;
-        z-index: 25;
+        transition: transform 0.8s ease-in-out, z-index 0.1s;
       }
       .letter-preview .heart-seal {
         font-size: 30px;
         color: var(--color-secondary);
-        opacity: 1;
       }
       .flap {
+        /* Nắp thư */
         position: absolute;
         top: 0;
         left: 0;
@@ -156,6 +334,7 @@
         border-top-right-radius: 8px;
       }
       .seal {
+        /* Con dấu */
         position: absolute;
         top: 110px;
         left: 50%;
@@ -171,123 +350,96 @@
         color: white;
         font-size: 10px;
         cursor: pointer;
-        transition: opacity 0.4s 0.2s, transform 0.3s;
+        transition: opacity 0.4s 0.2s;
       }
-      .seal i {
-        font-size: 10px;
-      }
+
+      /* Animation Mở thư */
       .envelope-wrapper.open .flap {
         transform: rotateX(180deg);
-        z-index: 1;
+        z-index: 1; /* Đẩy nắp ra sau */
       }
       .envelope-wrapper.open .seal {
         opacity: 0;
         pointer-events: none;
       }
       .envelope-wrapper.open .letter-preview {
-        top: 10px;
-        left: 15px;
-        opacity: 1;
-        cursor: pointer;
         z-index: 15;
         animation: letter-pop 0.8s 0.5s ease-in-out forwards;
+        cursor: pointer;
       }
       @keyframes letter-pop {
         0% {
           transform: translateY(0);
-          opacity: 1;
-        }
-        60% {
-          transform: translateY(-110px);
         }
         100% {
-          transform: translateY(-80px);
+          transform: translateY(-120px); /* Kéo lá thư lên */
         }
       }
-      .envelope-wrapper.open .letter-preview:hover {
-        transform: translateY(-85px);
-        box-shadow: 0 -5px 10px rgba(0, 0, 0, 0.1);
-      }
-      /* --- Nội dung Thư (Popup) --- */
+
+      /* --- Full Letter Popup (COPY CẤU TRÚC VÀ VỊ TRÍ) --- */
       #full-letter {
         position: fixed;
         top: 0;
         left: 0;
         width: 100%;
         height: 100%;
-        background: rgba(0, 0, 0, 0.6);
+        background: rgba(0, 0, 0, 0.7);
         z-index: 100;
         display: flex;
         justify-content: center;
         align-items: center;
         opacity: 0;
-        pointer-events: none;
-        transition: opacity 0.3s ease;
+        visibility: hidden;
+        transition: opacity 0.5s ease, visibility 0.5s ease;
       }
       #full-letter.show {
         opacity: 1;
+        visibility: visible;
         pointer-events: auto;
       }
-      .paper {
+      .letter-content {
         width: 90%;
-        max-width: 400px;
-        height: 80vh;
-        background: #fffafa;
+        max-width: 600px; /* To hơn index 1 chút cho admin */
+        max-height: 85vh;
+        background: #fffafa; /* Màu giấy thư */
         border-radius: 10px;
-        box-shadow: 0 0 20px rgba(255, 255, 255, 0.4);
-        padding: 25px;
-        position: relative;
+        padding: 40px;
         overflow-y: auto;
-        overflow-x: hidden;
-        transform: scale(0.8);
+        transform: scale(0.9);
         transition: transform 0.5s ease;
-        background-image: repeating-linear-gradient(
-          white 0px,
-          white 24px,
-          #e1e1e1 25px
-        );
-        line-height: 25px;
-        cursor: grab; /* Thêm cursor kéo/lướt */
-        touch-action: none; /* Ngăn chặn pull-to-refresh trên mobile */
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
       }
-      #full-letter.show .paper {
+      #full-letter.show .letter-content {
         transform: scale(1);
       }
-      .paper::-webkit-scrollbar {
-        width: 0px;
-        background: transparent;
-      }
-      .paper-content {
-        margin-top: 10px;
-      }
-      .paper h2 {
+      .letter-content h2 {
         font-family: "Dancing Script", cursive;
         text-align: center;
         color: #d62828;
-        font-size: 28px;
+        font-size: 32px;
         margin-bottom: 20px;
-        line-height: 1.2;
       }
-      .paper p,
-      .signature {
-        font-family: "Nunito", sans-serif;
-        color: #4a4a4a;
-        font-size: 16px;
-        text-align: justify;
-        margin-bottom: 15px;
-        white-space: pre-wrap;
+      .letter-content p {
+        font-size: 17px;
+        color: #333;
+        line-height: 1.6;
+        margin-bottom: 10px;
+      }
+      .letter-line {
+        /* Dòng thư được tạo ra cho hiệu ứng type */
         opacity: 0;
-        display: block;
         transition: opacity 0.1s;
+        min-height: 1.6em; /* Giữ chỗ để không bị CLS */
       }
       .signature {
         font-family: "Dancing Script", cursive;
         text-align: right;
-        font-size: 24px;
+        font-size: 30px;
         margin-top: 30px;
         color: #d62828;
       }
-      /* --- Điều khiển Nhạc --- */
+
+      /* --- Music Control --- */
       .music-control {
         position: fixed;
         top: 20px;
@@ -309,788 +461,474 @@
       }
       @keyframes musicRotate {
         0% {
-          transform: rotate(0deg) scale(1);
-        }
-        50% {
-          transform: rotate(180deg) scale(1.2);
+          transform: rotate(0deg);
         }
         100% {
-          transform: rotate(360deg) scale(1);
+          transform: rotate(360deg);
         }
       }
+
+      /* --- Generator UI --- */
+      #generator-ui {
+        width: 95%;
+        max-width: 600px;
+        background: rgba(255, 255, 255, 0.9);
+        backdrop-filter: blur(10px);
+        border-radius: 16px;
+        padding: 2rem;
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+        margin-top: 20px;
+        transition: all 0.3s ease;
+      }
+
+      /* Loading Overlay */
+      #loading-overlay {
+        position: fixed;
+        inset: 0;
+        background: white;
+        z-index: 9999;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        flex-direction: column;
+        color: #f06292;
+      }
+
+      /* Custom Alert Modal */
+      #custom-alert {
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.4);
+        z-index: 10000;
+        display: none; /* Mặc định ẩn */
+        justify-content: center;
+        align-items: center;
+      }
+      #custom-alert.show {
+        display: flex;
+      }
+      .alert-content {
+        background: white;
+        padding: 20px;
+        border-radius: 8px;
+        text-align: center;
+        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+        max-width: 300px;
+        width: 90%;
+      }
+      .alert-content button {
+        margin-top: 15px;
+        background: var(--color-primary);
+        color: white;
+        padding: 8px 15px;
+        border-radius: 5px;
+        transition: background 0.2s;
+      }
+      .alert-content button:hover {
+        background: #d62828;
+      }
+
+      /* Mobile Reponsive */
       @media (max-width: 480px) {
         .envelope {
+          width: 260px;
+          height: 170px;
+        }
+        .envelope::before {
           width: 260px;
           height: 170px;
         }
         .flap {
           border-left-width: 130px;
           border-right-width: 130px;
-          border-top-width: 105px;
         }
         .envelope::after {
           border-left-width: 130px;
           border-right-width: 130px;
-          border-bottom-width: 85px;
-        }
-        .envelope::before {
-          width: 260px;
-          height: 170px;
-        }
-        .letter-preview {
-          width: 230px;
-          height: 120px;
-        }
-        .letter-preview.in-pocket {
-          top: 75px;
-          left: 15px;
-        }
-        .seal {
-          top: 95px;
-        }
-        .paper {
-          max-width: 350px;
         }
       }
     </style>
   </head>
   <body>
-    <!-- Nhạc nền (Sẽ được thay đổi bằng JS nếu có tham số music) -->
+    <!-- Nhạc nền (Dùng cho chế độ xem thư) -->
     <audio id="bg-music" loop>
-      <!-- Mặc định (Nếu không có tham số music) -->
-      <source src="sound.m4a" type="audio/mp4" />
       <source src="sound.mp3" type="audio/mpeg" />
     </audio>
 
-    <!-- Nút điều khiển nhạc -->
-    <div class="music-control" onclick="toggleMusic()">
+    <!-- Loading Screen -->
+    <!-- <div id="loading-overlay" class="hidden">
+      <i class="fa-solid fa-heart fa-beat fa-3x mb-4"></i>
+      <p>Đang tải thư tình...</p>
+    </div> -->
+
+    <!-- Custom Alert Modal (Thay thế cho alert()) -->
+    <div id="custom-alert">
+      <div class="alert-content">
+        <p id="alert-message" class="text-gray-700"></p>
+        <button
+          onclick="document.getElementById('custom-alert').classList.remove('show');"
+        >
+          OK
+        </button>
+      </div>
+    </div>
+
+    <!-- Nút điều khiển nhạc (Dùng cho chế độ xem thư) -->
+    <div
+      class="music-control hidden"
+      id="music-control"
+      onclick="toggleMusic()"
+    >
       <i id="music-icon" class="fa-solid fa-volume-xmark"></i>
     </div>
 
-    <!-- Hiệu ứng tim bay -->
-    <div id="hearts-container"></div>
-
-    <!-- --- Giao diện Tạo Link Cá Nhân Hóa (Generator UI) --- -->
-    <div
-      id="generator-ui"
-      class="w-11/12 max-w-lg p-6 md:p-8 bg-white/80 backdrop-blur-sm rounded-xl shadow-2xl transition duration-500 ease-in-out z-10"
-    >
-      <h1
-        class="text-3xl font-bold text-center text-pink-600 mb-6 font-['Dancing_Script']"
+    <!-- === PHẦN 1: PHONG THƯ (ENVELOPE) - VỊ TRÍ ĐÃ FIX === -->
+    <div id="envelope-container">
+      <div class="envelope-wrapper" onclick="openEnvelope()">
+        <div class="envelope">
+          <div class="letter-preview">
+            <i class="fa-solid fa-heart heart-seal"></i>
+          </div>
+          <div class="flap"></div>
+          <div class="seal"><i class="fa-solid fa-heart"></i></div>
+        </div>
+      </div>
+      <p
+        class="absolute bottom-[-40px] text-pink-700 font-bold animate-bounce cursor-pointer"
+        onclick="openEnvelope()"
       >
-        💌 Tạo Thư Tình & Link Cá Nhân
+        Nhấn để mở thư <i class="fa-solid fa-envelope-open-text ml-1"></i>
+      </p>
+    </div>
+
+    <!-- === PHẦN 2: GENERATOR UI (Mặc định hiển thị) === -->
+    <div id="generator-ui">
+      <h1
+        class="text-3xl font-bold text-center text-pink-600 mb-2 font-['Dancing_Script']"
+      >
+        💌 Tạo Thư Tình
       </h1>
+
+      <!-- Nút Xem Thử Mẫu -->
+      <div class="flex justify-center mb-6">
+        <button
+          onclick="togglePreview()"
+          class="flex items-center space-x-2 px-4 py-2 bg-purple-100 text-purple-700 rounded-full hover:bg-purple-200 transition"
+        >
+          <i class="fa-regular fa-eye"></i>
+          <span id="preview-btn-text"
+            >Xem thử phong bì mẫu (Hiện ở đầu trang)</span
+          >
+        </button>
+      </div>
+
       <form id="link-form" class="space-y-4">
-        <!-- Input Tiêu đề -->
-        <div>
-          <label for="title" class="block text-sm font-semibold text-gray-700"
-            >Tiêu đề thư (Parameter: t)</label
-          >
-          <input
-            type="text"
-            id="title"
-            value="Thư Tình Yêu"
-            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-3 border focus:border-pink-500 focus:ring-pink-500"
-            required
-          />
+        <!-- Input fields -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-sm font-semibold text-gray-700"
+              >Tiêu đề thư</label
+            >
+            <input
+              type="text"
+              id="title"
+              value="Thư Tình Yêu"
+              class="mt-1 block w-full rounded-md border-gray-300 border p-2 focus:border-pink-500 outline-none"
+              required
+            />
+          </div>
+          <div>
+            <label class="block text-sm font-semibold text-gray-700"
+              >Gửi đến (Lời chào)</label
+            >
+            <input
+              type="text"
+              id="recipient"
+              value="Em yêu"
+              class="mt-1 block w-full rounded-md border-gray-300 border p-2 focus:border-pink-500 outline-none"
+              required
+            />
+          </div>
         </div>
-        <!-- Input Người nhận -->
+
         <div>
-          <label
-            for="recipient"
-            class="block text-sm font-semibold text-gray-700"
-            >Lời chào (Parameter: to)</label
-          >
-          <input
-            type="text"
-            id="recipient"
-            value="vợ yêu"
-            placeholder="Ví dụ: vợ yêu, ông xã, Tên người ấy..."
-            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-3 border focus:border-pink-500 focus:ring-pink-500"
-            required
-          />
-          <p class="text-xs text-gray-500 mt-1">
-            *Thư sẽ bắt đầu bằng: "Gửi [Lời chào],"
-          </p>
-        </div>
-        <!-- Input Nội dung -->
-        <div>
-          <label for="message" class="block text-sm font-semibold text-gray-700"
-            >Nội dung thư (Parameter: msg)</label
+          <label class="block text-sm font-semibold text-gray-700"
+            >Nội dung thư</label
           >
           <textarea
             id="message"
             rows="6"
-            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-3 border focus:border-pink-500 focus:ring-pink-500"
+            class="mt-1 block w-full rounded-md border-gray-300 border p-2 focus:border-pink-500 outline-none"
             required
           >
-Hôm nay không phải dịp gì đặc biệt cả, nhưng em chỉ muốn gửi đến anh lời nhắn này. Em muốn anh biết rằng em yêu anh rất nhiều. Dù khoảng cách có xa, em vẫn muốn anh cảm thấy một chút ấm áp, mong anh giữ gìn sức khoẻ, giữ bình yên trong lòng, và luôn nhớ rằng em đang đợi anh. Chúc anh mỗi ngày đều may mắn và hạnh phúc hơn hôm qua.
+Gửi đến người con gái anh yêu thương nhất,
 
-Em mong rằng thư này sẽ mang lại niềm vui cho anh, yêu anh hơn từng ngày!</textarea
+Từ khi có em, thế giới của anh như được tô thêm ngàn màu sắc. Mỗi ngày thức dậy, điều đầu tiên anh nghĩ đến là nụ cười của em. Anh biết ơn số phận đã đưa em đến bên anh.
+
+Yêu em nhiều hơn những gì con chữ có thể nói được.</textarea
           >
-        </div>
-        <!-- Input Lời kết -->
-        <div>
-          <label
-            for="conclusion"
-            class="block text-sm font-semibold text-gray-700"
-            >Lời kết trước chữ ký (Parameter: con)</label
-          >
-          <input
-            type="text"
-            id="conclusion"
-            value="Yêu thương nhất,"
-            placeholder="Ví dụ: Gửi người em thương, Trân trọng,"
-            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-3 border focus:border-pink-500 focus:ring-pink-500"
-            required
-          />
-        </div>
-        <!-- Input Chữ ký -->
-        <div>
-          <label for="sender" class="block text-sm font-semibold text-gray-700"
-            >Chữ ký/Người gửi (Parameter: from)</label
-          >
-          <input
-            type="text"
-            id="sender"
-            value="ABC"
-            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-3 border focus:border-pink-500 focus:ring-pink-500"
-            required
-          />
         </div>
 
-        <!-- Input Link Nhạc / Tải file MP3 (Cloudinary) -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-sm font-semibold text-gray-700"
+              >Lời kết</label
+            >
+            <input
+              type="text"
+              id="conclusion"
+              value="Mãi yêu em,"
+              class="mt-1 block w-full rounded-md border-gray-300 border p-2 focus:border-pink-500 outline-none"
+              required
+            />
+          </div>
+          <div>
+            <label class="block text-sm font-semibold text-gray-700"
+              >Người gửi (Ký tên)</label
+            >
+            <input
+              type="text"
+              id="sender"
+              value="Anh"
+              class="mt-1 block w-full rounded-md border-gray-300 border p-2 focus:border-pink-500 outline-none"
+              required
+            />
+          </div>
+        </div>
+
+        <!-- Music -->
         <div class="border p-4 rounded-lg bg-pink-50">
-          <label for="music" class="block text-sm font-bold text-pink-700 mb-2"
-            >Âm nhạc nền (Parameter: music)</label
+          <label class="block text-sm font-bold text-pink-700 mb-2"
+            >Nhạc nền (Link MP3)</label
           >
-
-          <!-- Tùy chọn 1: Link nhạc (URL) -->
           <input
             type="url"
             id="music-url"
-            placeholder="Dán Link nhạc (MP3/M4A/OGG) trực tiếp ở đây (Ưu tiên)"
-            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-3 border focus:border-pink-500 focus:ring-pink-500"
+            placeholder="Dán link nhạc (.mp3) hoặc để trống để dùng nhạc mặc định"
+            class="mt-1 block w-full rounded-md border-gray-300 border p-2 focus:border-pink-500 outline-none"
           />
 
           <div class="flex items-center space-x-3 my-2">
             <hr class="flex-grow border-pink-200" />
-            <span class="text-xs text-pink-600 font-semibold"
-              >HOẶC (Sử dụng Cloudinary)</span
-            >
+            <span class="text-xs text-pink-600">HOẶC UPLOAD (Cloudinary)</span>
             <hr class="flex-grow border-pink-200" />
           </div>
 
-          <!-- Tùy chọn 2: Tải file MP3 cục bộ -->
           <input
             type="file"
             id="music-file"
-            accept=".mp3"
-            class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-pink-100 file:text-pink-700 hover:file:bg-pink-200"
+            accept=".mp3, .m4a"
+            class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:bg-pink-100 file:text-pink-700 hover:file:bg-pink-200"
           />
-          <p id="file-status" class="text-xs text-gray-600 mt-1 italic">
-            (Tệp tin sẽ được tải lên Cloudinary sau khi nhấn "Tạo Link")
+          <p id="file-status" class="text-xs text-gray-500 mt-1 italic">
+            File sẽ được upload lên Cloudinary khi nhấn "Tạo Link"
           </p>
         </div>
 
         <button
           type="button"
           id="generate-btn"
-          onclick="handleLinkGeneration()"
-          class="w-full py-3 px-4 bg-pink-500 text-white font-semibold rounded-lg shadow-lg hover:bg-pink-600 transition duration-300 transform hover:scale-[1.01]"
+          onclick="handleFirebaseGeneration()"
+          class="w-full py-3 px-4 bg-pink-500 text-white font-bold rounded-lg shadow-lg hover:bg-pink-600 transition hover:scale-[1.01]"
         >
-          <i class="fa-solid fa-link mr-2"></i>Tạo Link Cá Nhân Hóa
+          <i class="fa-solid fa-paper-plane mr-2"></i> Lưu và Tạo Link Chia Sẻ
         </button>
       </form>
 
-      <!-- Kết quả Link -->
+      <!-- Result -->
       <div
         id="result-container"
         class="mt-6 p-4 border border-green-400 bg-green-50 rounded-lg hidden"
       >
-        <label class="block text-sm font-semibold text-green-700 mb-2"
-          >Link của bạn (Copy và gửi đi!)</label
+        <label class="block text-sm font-bold text-green-700 mb-2"
+          >Link đã tạo thành công:</label
         >
         <div class="flex items-center space-x-2">
           <input
             type="text"
             id="generated-link"
             readonly
-            class="flex-grow rounded-md border-gray-300 shadow-sm p-2 text-sm bg-white cursor-text"
+            class="flex-grow rounded-md border p-2 text-sm bg-white text-gray-700"
           />
           <button
             onclick="copyLink()"
-            class="p-2 bg-green-500 text-white rounded-md hover:bg-green-600 transition duration-150"
+            class="p-2 bg-green-500 text-white rounded hover:bg-green-600"
           >
             <i class="fa-solid fa-copy"></i>
           </button>
         </div>
-        <p
-          id="copy-message"
-          class="text-xs text-green-500 mt-2 opacity-0 transition duration-300"
-        >
-          Đã sao chép!
-        </p>
         <a
           id="test-link"
+          href="#"
           target="_blank"
-          class="mt-3 inline-block text-sm text-pink-600 hover:text-pink-800 underline transition duration-150"
-          >Mở thử Link này</a
+          class="block mt-2 text-center text-pink-600 font-bold hover:underline"
+          >👉 Mở thư ngay</a
         >
       </div>
-
-      <!-- Loading Indicator -->
-      <div
-        id="loading-indicator"
-        class="mt-4 p-3 bg-blue-100 text-blue-700 rounded-lg hidden"
-      >
-        <i class="fa-solid fa-cloud-arrow-up fa-spin mr-2"></i> Đang tải tệp MP3
-        lên Cloudinary... Vui lòng chờ.
-      </div>
     </div>
-    <!-- --- Hết Giao diện Tạo Link --- -->
 
-    <!-- Phong thư (Chỉ hiển thị khi xem link đã tạo) -->
-    <div class="envelope-wrapper" onclick="openEnvelope()">
-      <div class="envelope">
-        <!-- Lá thư bên trong (Preview) -->
+    <!-- === POPUP NỘI DUNG THƯ (Overlay) === -->
+    <div id="full-letter" onclick="hideFullLetter(event)">
+      <div class="letter-content" onclick="event.stopPropagation()">
+        <h2 id="final-title">Thư Tình</h2>
+        <p id="final-greeting" class="font-bold"></p>
+        <!-- Container mới cho các dòng thư được tạo tự động -->
         <div
-          id="letter-preview"
-          class="letter-preview in-pocket"
-          onclick="showFullLetter(event)"
+          id="final-message"
+          class="whitespace-pre-wrap leading-relaxed indent-8"
         >
-          <i class="fa-solid fa-heart heart-seal"></i>
-        </div>
-
-        <!-- Nắp phong bì (Phải là một thẻ riêng để lật) -->
-        <div class="flap"></div>
-
-        <!-- Tem trái tim khóa phong bì -->
-        <div class="seal">
-          <i class="fa-solid fa-heart"></i>
-        </div>
-      </div>
-    </div>
-
-    <!-- Nội dung thư đầy đủ (Popup) -->
-    <!-- Xóa onclick="hideFullLetter(event)" để chỉ dùng touch/swipe hoặc click vào dark overlay -->
-    <div id="full-letter">
-      <div class="paper" onclick="event.stopPropagation()">
-        <div class="paper-content">
-          <h2 id="custom-title">Thư Tình Yêu</h2>
-
-          <!-- Dòng 1: Lời chào (Customizable: to) -->
-          <p
-            class="letter-line"
-            data-text="Gửi người thương,"
-            id="greeting-line"
-          >
-            Gửi người thương,
-          </p>
-
-          <!-- Dòng 2: Nội dung chính (Customizable: msg) -->
-          <p
-            class="letter-line"
-            data-text="[Nội dung thư sẽ được tải từ link tùy chỉnh]"
-            id="body-line"
-          >
-            [Nội dung thư sẽ được tải từ link tùy chỉnh]
-          </p>
-
-          <!-- Chữ ký (Customizable: con, from) -->
-          <div
-            class="signature letter-line"
-            data-text="Yêu thương nhất,<br>ABC"
-            id="signature-line"
-          >
-            Yêu thương nhất,<br />
-            ABC
+          <!-- Các thẻ <div class="letter-line" data-full-text="..."> được JS tạo ra ở đây -->
+          <div class="text-center text-gray-400 text-base italic">
+            Nội dung thư sẽ được tải và hiển thị hiệu ứng đánh máy.
           </div>
         </div>
+        <div class="signature" id="final-signature">Mãi yêu,<br />Anh</div>
       </div>
     </div>
 
     <script>
-      // =================================================================
-      // === CẤU HÌNH CLOUDINARY (QUAN TRỌNG: PHẢI THAY THẾ GIÁ TRỊ GIẢ) ===
-      // =================================================================
-      const CLOUD_NAME = "dys3wgutz"; // <-- THAY THẾ BẰNG CLOUD NAME CỦA BẠN
-      const UPLOAD_PRESET = "comic_raw_files_preset"; // <-- THAY THẾ BẰNG UPLOAD PRESET (PHẢI LÀ UNSIGNED)
+      // --- LOGIC HIỆU ỨNG ĐÁNH MÁY (COPIED) ---
+      let typingIntervals = [];
+      let fullMessageHtml = ""; // Biến lưu nội dung HTML đầy đủ
+      const TYPING_SPEED = 50; // Tốc độ đánh máy
 
-      // --- Cấu hình chung ---
-      const TYPING_SPEED = 30; // ms per character
-      const MUSIC_MAX_SIZE = 5 * 1024 * 1024; // Giới hạn 5MB
-      let isEnvelopeOpen = false;
-      let isTyping = false;
-      let typingTimeoutId = null;
-      let isUploading = false;
+      // 1. Hàm type từng chữ
+      function typeLine(lineElement, text) {
+        return new Promise((resolve) => {
+          let i = 0;
+          const interval = setInterval(() => {
+            if (i < text.length) {
+              lineElement.innerHTML += text.charAt(i);
+              i++;
+            } else {
+              clearInterval(interval);
+              resolve();
+            }
+          }, TYPING_SPEED);
+          typingIntervals.push(interval);
+        });
+      }
 
-      // Các elements
+      // 2. Hàm bắt đầu type từng dòng
+      async function startTyping(letterLines) {
+        for (let i = 0; i < letterLines.length; i++) {
+          const line = letterLines[i];
+          const fullText = line.getAttribute("data-full-text");
+
+          // Hiện dòng lên trước khi type
+          line.style.opacity = "1";
+
+          await typeLine(line, fullText);
+          // Thêm một khoảng nghỉ nhỏ giữa các dòng
+          await new Promise((r) => setTimeout(r, 100));
+        }
+      }
+
+      // 3. Hàm reset (khi đóng popup)
+      function resetTyping() {
+        typingIntervals.forEach(clearInterval);
+        typingIntervals = [];
+        // Khôi phục lại nội dung đầy đủ (Không type nữa, hiện ngay)
+        const messageContainer = document.getElementById("final-message");
+        if (messageContainer) {
+          messageContainer.innerHTML = fullMessageHtml;
+        }
+      }
+
+      // --- LOGIC GIAO DIỆN CHUNG ---
+      const fullLetter = document.getElementById("full-letter");
       const music = document.getElementById("bg-music");
       const musicIcon = document.getElementById("music-icon");
-      const fullLetter = document.getElementById("full-letter");
-      const letterLines = document.querySelectorAll(".letter-line");
-      const letterPreview = document.getElementById("letter-preview");
-      const generatorUI = document.getElementById("generator-ui");
-      const customTitleEl = document.getElementById("custom-title");
-      const greetingLineEl = document.getElementById("greeting-line");
-      const bodyLineEl = document.getElementById("body-line");
-      const signatureLineEl = document.getElementById("signature-line");
-      const generatedLinkInput = document.getElementById("generated-link");
-      const musicFileEl = document.getElementById("music-file");
-      const fileStatusEl = document.getElementById("file-status");
-      const generateBtn = document.getElementById("generate-btn");
-      const loadingIndicator = document.getElementById("loading-indicator");
-      const paperEl = document.querySelector(".paper");
+      let isPlaying = false;
+      let isEnvelopeOpen = false;
 
-      // --- Logic Tải File lên Cloudinary (Chính) ---
-      async function uploadFileToCloudinary(file) {
-        if (
-          CLOUD_NAME === "your_cloud_name_here" ||
-          UPLOAD_PRESET === "unsigned_preset_name"
-        ) {
-          // alert thay bằng console.error để tránh lỗi trên iFrame
-          console.error(
-            "LỖI CẤU HÌNH: Vui lòng thay thế CLOUD_NAME và UPLOAD_PRESET trong mã nguồn."
-          );
-          return null;
-        }
+      // Hàm hiển thị custom alert (Thay thế cho alert())
+      window.showCustomAlert = (message) => {
+        document.getElementById("alert-message").textContent = message;
+        document.getElementById("custom-alert").classList.add("show");
+      };
 
-        if (file.size > MUSIC_MAX_SIZE) {
-          console.error(
-            `Tệp nhạc quá lớn (${(file.size / (1024 * 1024)).toFixed(
-              1
-            )}MB). Vui lòng chọn tệp dưới 5MB.`
-          );
-          return null;
-        }
+      // 1. Toggle Preview (Đưa thư lên đầu)
+      function togglePreview() {
+        const body = document.body;
+        const btnText = document.getElementById("preview-btn-text");
 
-        const url = `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/auto/upload`;
-        const formData = new FormData();
-        formData.append("file", file);
-        formData.append("upload_preset", UPLOAD_PRESET);
+        // Áp dụng dữ liệu hiện tại lên UI preview trước khi hiện
+        const currentData = {
+          t: document.getElementById("title").value,
+          to: document.getElementById("recipient").value,
+          msg: document.getElementById("message").value,
+          con: document.getElementById("conclusion").value,
+          from: document.getElementById("sender").value,
+          music: document.getElementById("music-url").value,
+        };
+        window.applyDataToUI(currentData);
+        resetTyping(); // Đảm bảo nội dung được load đầy đủ
 
-        isUploading = true;
-        generateBtn.disabled = true;
-        loadingIndicator.classList.remove("hidden");
-        fileStatusEl.textContent = `🔊 Đang tải lên: ${file.name}...`;
+        body.classList.toggle("show-preview");
 
-        try {
-          const response = await fetch(url, {
-            method: "POST",
-            body: formData,
-          });
-
-          const data = await response.json();
-
-          isUploading = false;
-          generateBtn.disabled = false;
-          loadingIndicator.classList.add("hidden");
-
-          if (data.secure_url) {
-            fileStatusEl.textContent = `✅ Tải lên thành công! URL: ${data.secure_url.substring(
-              0,
-              40
-            )}...`;
-            fileStatusEl.classList.remove("text-red-500");
-            fileStatusEl.classList.add("text-green-600");
-            return data.secure_url;
-          } else {
-            console.error("Cloudinary upload error:", data);
-            fileStatusEl.textContent =
-              "❌ Lỗi tải lên. Vui lòng thử lại hoặc kiểm tra cấu hình.";
-            fileStatusEl.classList.add("text-red-500");
-            return null;
-          }
-        } catch (error) {
-          console.error("Lỗi kết nối Cloudinary:", error);
-          isUploading = false;
-          generateBtn.disabled = false;
-          loadingIndicator.classList.add("hidden");
-          fileStatusEl.textContent =
-            "❌ Lỗi kết nối. Vui lòng kiểm tra internet.";
-          fileStatusEl.classList.add("text-red-500");
-          return null;
+        if (body.classList.contains("show-preview")) {
+          window.scrollTo({ top: 0, behavior: "smooth" });
+          btnText.textContent = "Ẩn phong bì mẫu";
+        } else {
+          btnText.textContent = "Xem thử phong bì mẫu (Hiện ở đầu trang)";
         }
       }
 
-      // --- Logic Tạo Link (Generator Mode) ---
-      async function handleLinkGeneration() {
-        const musicFile = musicFileEl.files[0];
-        const musicUrlVal = document.getElementById("music-url").value.trim();
-        let finalMusicUrl = musicUrlVal;
-
-        // 1. Kiểm tra nội dung bắt buộc
-        const titleVal = document.getElementById("title").value;
-        const recipientVal = document.getElementById("recipient").value;
-        const messageVal = document.getElementById("message").value;
-        const conclusionVal = document.getElementById("conclusion").value;
-        const senderVal = document.getElementById("sender").value;
-
-        if (
-          !titleVal ||
-          !recipientVal ||
-          !messageVal ||
-          !conclusionVal ||
-          !senderVal
-        ) {
-          console.error(
-            "Vui lòng nhập đầy đủ Tiêu đề, Lời chào, Nội dung, Lời kết và Chữ ký."
-          );
-          return;
-        }
-
-        // 2. Xử lý tải file nếu có
-        if (musicFile) {
-          if (isUploading) {
-            console.warn("Đang tải file lên Cloudinary, vui lòng chờ...");
-            return;
-          }
-          finalMusicUrl = await uploadFileToCloudinary(musicFile);
-          if (!finalMusicUrl) {
-            // Upload thất bại hoặc lỗi cấu hình
-            return;
-          }
-        }
-
-        // 3. Tạo Link
-        generateLink(
-          titleVal,
-          recipientVal,
-          messageVal,
-          conclusionVal,
-          senderVal,
-          finalMusicUrl
-        );
-      }
-
-      function generateLink(
-        titleVal,
-        recipientVal,
-        messageVal,
-        conclusionVal,
-        senderVal,
-        musicUrl
-      ) {
-        // Lấy đường dẫn gốc của trang
-        const baseUrl = window.location.href.split("?")[0];
-
-        // Mã hóa các tham số
-        const params = new URLSearchParams();
-        params.append("t", titleVal);
-        params.append("to", recipientVal);
-        params.append("msg", messageVal.replace(/\n/g, "\n")); // Giữ lại \n
-        params.append("con", conclusionVal);
-        params.append("from", senderVal);
-
-        if (musicUrl) {
-          params.append("music", musicUrl); // Dùng URL từ Cloudinary hoặc URL trực tiếp
-        }
-
-        const finalLink = `${baseUrl}?${params.toString()}`;
-
-        // Hiển thị kết quả
-        document.getElementById("result-container").classList.remove("hidden");
-        generatedLinkInput.value = finalLink;
-        document.getElementById("test-link").href = finalLink;
-
-        // Cuộn xuống để người dùng thấy link
-        generatorUI.scrollIntoView({ behavior: "smooth", block: "start" });
-      }
-
-      function copyLink() {
-        generatedLinkInput.select();
-        document.execCommand("copy"); // Sao chép vào clipboard
-
-        const msg = document.getElementById("copy-message");
-        msg.classList.add("opacity-100");
-        setTimeout(() => {
-          msg.classList.remove("opacity-100");
-        }, 1500);
-      }
-
-      // --- Hàm Tiện Ích (Xử lý Tham số URL) ---
-      function getUrlParameter(name) {
-        name = name.replace(/[\[]/, "\\[").replace(/[\]]/, "\\]");
-        const regex = new RegExp("[\\?&]" + name + "=([^&#]*)");
-        const results = regex.exec(location.search);
-        return results === null
-          ? ""
-          : decodeURIComponent(results[1].replace(/\+/g, " "));
-      }
-
-      // --- Áp dụng Nội dung Tùy chỉnh (View Mode) ---
-      function applyCustomContent() {
-        const customTitle = getUrlParameter("t");
-        const customTo = getUrlParameter("to");
-        const customMsg = getUrlParameter("msg");
-        const customCon = getUrlParameter("con"); // Lời kết mới
-        const customFrom = getUrlParameter("from");
-        const customMusicUrl = getUrlParameter("music"); // Dùng URL từ Cloudinary
-
-        let isCustomLink = false;
-
-        // 1. Update Title
-        if (customTitle) {
-          customTitleEl.textContent = customTitle;
-          document.title = customTitle;
-          isCustomLink = true;
-        }
-
-        // 2. Update Greeting (First line)
-        if (customTo) {
-          const newGreeting = `Gửi ${customTo},`;
-          greetingLineEl.setAttribute("data-text", newGreeting);
-          isCustomLink = true;
-        }
-
-        // 3. Update Body (Second line)
-        if (customMsg) {
-          const cleanMsg = customMsg.replace(/<br\s*\/?>/gi, "\n");
-          bodyLineEl.setAttribute("data-text", cleanMsg);
-          isCustomLink = true;
-        }
-
-        // 4. Update Signature (Last line)
-        if (customCon && customFrom) {
-          const newSignature = `${customCon}<br>${customFrom}`;
-          signatureLineEl.setAttribute("data-text", newSignature);
-          signatureLineEl.innerHTML = newSignature;
-          isCustomLink = true;
-        } else if (customFrom) {
-          const defaultCon = getUrlParameter("con") || "Yêu thương nhất,";
-          const newSignature = `${defaultCon}<br>${customFrom}`;
-          signatureLineEl.setAttribute("data-text", newSignature);
-          signatureLineEl.innerHTML = newSignature;
-          isCustomLink = true;
-        }
-
-        // 5. Update Music (Dùng URL từ tham số music)
-        if (customMusicUrl) {
-          music.innerHTML = `<source src="${customMusicUrl}" type="audio/mpeg" onerror="console.error('Lỗi tải nhạc: Không tìm thấy hoặc định dạng không hỗ trợ.');">`;
-          music.load(); // Tải nhạc mới
-          isCustomLink = true;
-        }
-
-        // 6. Ẩn Generator và Hiện Phong Thư nếu đây là Link đã tạo
-        if (isCustomLink) {
-          document.body.classList.add("is-custom-link");
-        }
-      }
-
-      // --- Khởi tạo ---
-      applyCustomContent();
-
-      // --- Các hàm Envelope và Typewriter (Giữ nguyên) ---
-
-      function createHeart() {
-        const container = document.getElementById("hearts-container");
-        const heart = document.createElement("div");
-        heart.classList.add("bg-heart");
-
-        const left = Math.random() * 100;
-        const duration = Math.random() * 5 + 5;
-
-        heart.innerHTML = '<i class="fa-solid fa-heart"></i>';
-        heart.style.left = left + "vw";
-        heart.style.animationDuration = duration + "s";
-
-        container.appendChild(heart);
-
-        setTimeout(() => {
-          heart.remove();
-        }, duration * 1000);
-      }
-
-      // Chỉ tạo hiệu ứng tim bay khi ở chế độ xem link
-      if (document.body.classList.contains("is-custom-link")) {
-        setInterval(createHeart, 600);
-      }
-
+      // 2. Mở thư (Đã cập nhật cơ chế mở thư và hiệu ứng type)
       function openEnvelope() {
-        if (isEnvelopeOpen) return;
-
-        isEnvelopeOpen = true;
-
         const wrapper = document.querySelector(".envelope-wrapper");
-        wrapper.classList.add("open");
+        const letterLines = Array.from(
+          document.querySelectorAll("#final-message .letter-line")
+        );
 
-        letterPreview.classList.remove("in-pocket");
-
-        playMusic();
-      }
-
-      function resetTyping() {
-        if (typingTimeoutId) {
-          clearTimeout(typingTimeoutId);
-          typingTimeoutId = null;
-        }
-        isTyping = false;
-
-        letterLines.forEach((line) => {
-          const originalText = line.getAttribute("data-text");
-          // Khôi phục nội dung tĩnh (không có hiệu ứng) để tránh lỗi nếu người dùng đóng thư nhanh
-          line.innerHTML = originalText.replace(/\n/g, "<br>");
-          line.style.opacity = "0";
-        });
-      }
-
-      function typeLine(element, text) {
-        return new Promise((resolve) => {
-          if (!isTyping || fullLetter.classList.contains("show") === false) {
-            resolve();
-            return;
-          }
-
-          let i = 0;
-          element.innerHTML = "";
-          element.style.opacity = "1";
-
-          function typeChar() {
-            if (!isTyping || fullLetter.classList.contains("show") === false) {
-              resolve();
-              return;
-            }
-
-            if (i < text.length) {
-              const char = text.charAt(i);
-
-              if (text.substring(i, i + 4) === "<br>") {
-                // Xử lý thẻ <br> (ví dụ: trong chữ ký)
-                element.innerHTML += "<br>";
-                i += 4;
-              } else if (text.substring(i, i + 1) === "\n") {
-                // Xử lý xuống dòng (\n) cho nội dung thân thư
-                element.innerHTML += "<br>";
-                i += 1;
-              } else {
-                element.innerHTML += char;
-                i++;
-              }
-
-              typingTimeoutId = setTimeout(typeChar, TYPING_SPEED);
-            } else {
-              resolve();
-            }
-          }
-
-          typeChar();
-        });
-      }
-
-      async function startTyping(lines) {
-        if (isTyping) return;
-        isTyping = true;
-
-        for (let i = 0; i < lines.length; i++) {
-          if (!isTyping || fullLetter.classList.contains("show") === false)
-            break;
-
-          const line = lines[i];
-          const originalText = line.getAttribute("data-text");
-
-          await typeLine(line, originalText);
-
-          if (isTyping && i < lines.length - 1) {
-            await new Promise((resolve) => {
-              typingTimeoutId = setTimeout(resolve, 500);
-            });
-          }
-        }
-        if (isTyping) {
-          isTyping = false;
-        }
-      }
-
-      function showFullLetter(e) {
-        e.stopPropagation();
+        // Bắt đầu phát nhạc (Chỉ nên có trong letter.html, nhưng vẫn giữ ở đây cho View Mode)
+        // playMusic();
 
         if (isEnvelopeOpen) {
+          // Nếu đã mở (chỉ đóng popup trước đó), chỉ cần hiện lại popup
           fullLetter.classList.add("show");
 
-          // Đảm bảo tất cả chữ bị ẩn trước khi type
+          // Reset hiệu ứng type và bắt đầu lại
+          resetTyping();
           letterLines.forEach((line) => {
             line.style.opacity = "0";
             line.innerHTML = "";
           });
-
-          // Bắt đầu hiệu ứng đánh máy
-          startTyping(letterLines);
+          if (letterLines.length > 0) {
+            startTyping(letterLines);
+          }
+          return;
         }
+
+        // Lần đầu mở
+        isEnvelopeOpen = true;
+        wrapper.classList.add("open");
+
+        // Đợi animation xong thì hiện popup (1000ms = 0.6s flap + 0.4s delay)
+        setTimeout(() => {
+          fullLetter.classList.add("show");
+
+          if (letterLines.length > 0) {
+            // Đảm bảo nội dung trống trước khi type
+            letterLines.forEach((line) => {
+              line.innerHTML = "";
+            });
+            // Bắt đầu hiệu ứng đánh máy
+            startTyping(letterLines);
+          }
+        }, 1000);
       }
 
-      // --- Đã tối ưu hóa: Chỉ ẩn popup và reset typing ---
-      function hideFullLetter() {
-        fullLetter.classList.remove("show");
-        resetTyping();
-      }
-
-      // Gắn sự kiện click vào vùng tối (để đóng thư)
-      fullLetter.addEventListener("click", (e) => {
-        // Chỉ đóng khi click trực tiếp vào #full-letter (vùng tối)
+      // 3. Đóng popup khi click ra ngoài
+      function hideFullLetter(e) {
         if (e.target.id === "full-letter") {
-          hideFullLetter();
+          fullLetter.classList.remove("show");
+          resetTyping(); // Dừng hiệu ứng type
         }
-      });
+      }
 
-      // --- Logic Lướt/Vuốt (Swiping UI cho Mobile) ---
-      let startY = 0;
-      const SWIPE_THRESHOLD = 100; // Ngưỡng vuốt xuống để đóng (pixels)
-
-      paperEl.addEventListener("touchstart", (e) => {
-        // Chỉ bắt đầu vuốt nếu là chạm đơn
-        if (e.touches.length === 1) {
-          startY = e.touches[0].clientY;
-          paperEl.style.transition = "none"; // Tắt transition khi đang vuốt
-        }
-      });
-
-      paperEl.addEventListener("touchmove", (e) => {
-        // Ngăn chặn cuộn trang mặc định khi vuốt
-        if (e.touches.length === 1) {
-          const currentY = e.touches[0].clientY;
-          const deltaY = currentY - startY;
-
-          if (deltaY > 0) {
-            // Chỉ cho phép vuốt xuống
-            e.preventDefault();
-            // Di chuyển giấy theo ngón tay
-            paperEl.style.transform = `translateY(${deltaY}px) scale(1)`;
-          }
-        }
-      });
-
-      paperEl.addEventListener("touchend", (e) => {
-        // Khôi phục transition để đóng/đưa về vị trí cũ mượt mà
-        paperEl.style.transition =
-          "transform 0.3s cubic-bezier(0.16, 1, 0.3, 1)";
-
-        if (e.changedTouches.length === 1) {
-          const endY = e.changedTouches[0].clientY;
-          const deltaY = endY - startY;
-
-          if (deltaY > SWIPE_THRESHOLD) {
-            // Đạt ngưỡng: Đóng thư
-
-            // Tạo hiệu ứng trượt ra ngoài
-            paperEl.style.transform = `translateY(${window.innerHeight}px) scale(1)`;
-
-            // Sau khi trượt, ẩn popup và reset vị trí cho lần mở tiếp theo
-            setTimeout(() => {
-              hideFullLetter(); // Gọi hàm ẩn thư đã tối ưu
-              paperEl.style.transition = "transform 0.5s ease"; // Dùng lại transition mặc định khi mở
-              paperEl.style.transform = "scale(1)"; // Reset vị trí cho lần mở sau
-            }, 300);
-          } else {
-            // Không đạt ngưỡng: Đưa giấy về vị trí cũ (ở giữa)
-            paperEl.style.transform = "scale(1)";
-          }
-        }
-      });
-
-      // --- Logic Nhạc ---
-      let isPlaying = false;
-
+      // 4. Nhạc nền (Chỉ hoạt động trong View Mode)
       function toggleMusic() {
         if (isPlaying) {
           music.pause();
@@ -1110,12 +948,162 @@ Em mong rằng thư này sẽ mang lại niềm vui cho anh, yêu anh hơn từn
             musicIcon.classList.remove("fa-volume-xmark");
             musicIcon.classList.add("fa-volume-high", "note-anim");
           })
-          .catch((error) => {
-            console.log(
-              "Trình duyệt chặn auto-play, cần tương tác người dùng trước."
-            );
-          });
+          .catch((e) => console.log("Cần tương tác để phát nhạc"));
       }
+
+      // --- LOGIC XỬ LÝ DATA (FIREBASE + UPLOAD) ---
+
+      // Cloudinary config
+      const CLOUD_NAME = "dys3wgutz";
+      const UPLOAD_PRESET = "comic_raw_files_preset";
+
+      async function uploadToCloudinary(file) {
+        const formData = new FormData();
+        formData.append("file", file);
+        formData.append("upload_preset", UPLOAD_PRESET);
+
+        try {
+          const res = await fetch(
+            `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/upload`,
+            {
+              method: "POST",
+              body: formData,
+            }
+          );
+          const data = await res.json();
+          return data.secure_url;
+        } catch (e) {
+          console.error(e);
+          window.showCustomAlert(
+            "Lỗi upload nhạc lên Cloudinary. Vui lòng thử lại."
+          );
+          return null;
+        }
+      }
+
+      async function handleFirebaseGeneration() {
+        const btn = document.getElementById("generate-btn");
+        btn.disabled = true;
+        btn.innerHTML =
+          '<i class="fa-solid fa-spinner fa-spin"></i> Đang xử lý...';
+
+        // 1. Lấy dữ liệu form
+        const title = document.getElementById("title").value;
+        const to = document.getElementById("recipient").value;
+        const msg = document.getElementById("message").value;
+        const con = document.getElementById("conclusion").value;
+        const from = document.getElementById("sender").value;
+        let musicUrl = document.getElementById("music-url").value;
+        const musicFile = document.getElementById("music-file").files[0];
+
+        if (!msg.trim()) {
+          window.showCustomAlert("Nội dung thư không được để trống!");
+          btn.disabled = false;
+          btn.innerHTML =
+            '<i class="fa-solid fa-paper-plane mr-2"></i> Lưu và Tạo Link Chia Sẻ';
+          return;
+        }
+
+        // 2. Upload nhạc nếu có file
+        if (musicFile) {
+          const uploadedUrl = await uploadToCloudinary(musicFile);
+          if (uploadedUrl) musicUrl = uploadedUrl;
+        }
+
+        // 3. Chuẩn bị data object
+        const letterData = {
+          t: title.trim(),
+          to: to.trim(),
+          msg: msg, // Giữ nguyên định dạng \n
+          con: con.trim(),
+          from: from.trim(),
+          music: musicUrl.trim(),
+        };
+
+        // 4. Lưu vào RTDB
+        const newId = await window.saveLetterToFirebase(letterData);
+
+        btn.disabled = false;
+        btn.innerHTML =
+          '<i class="fa-solid fa-paper-plane mr-2"></i> Lưu và Tạo Link Chia Sẻ';
+
+        if (newId) {
+          const baseUrl = window.location.href.split("admin.html")[0];
+          // SỬA: Trỏ về letter.html thay vì file hiện tại
+          const finalLink = `${baseUrl}letter.html?id=${newId}`;
+
+          document
+            .getElementById("result-container")
+            .classList.remove("hidden");
+          document.getElementById("generated-link").value = finalLink;
+          document.getElementById("test-link").href = finalLink;
+
+          // Scroll xuống result
+          document
+            .getElementById("result-container")
+            .scrollIntoView({ behavior: "smooth" });
+
+          // Cập nhật preview UI
+          window.applyDataToUI(letterData);
+          document.body.classList.add("show-preview");
+        }
+      }
+
+      function copyLink() {
+        const copyText = document.getElementById("generated-link");
+        copyText.select();
+        document.execCommand("copy");
+        window.showCustomAlert("Đã sao chép link!"); // Dùng custom alert
+      }
+
+      // --- HÀM APPLY DỮ LIỆU LÊN UI (KHI XEM THƯ) ---
+      window.applyDataToUI = (data) => {
+        // Cập nhật tiêu đề trang
+        document.title = data.t || "Thư gửi người thương";
+        document.getElementById("final-title").textContent = data.t;
+
+        // Cập nhật lời chào
+        document.getElementById(
+          "final-greeting"
+        ).textContent = `Gửi ${data.to},`;
+
+        // Cập nhật chữ ký
+        document.getElementById(
+          "final-signature"
+        ).innerHTML = `${data.con}<br>${data.from}`;
+
+        // Cập nhật nhạc (Chỉ áp dụng nếu có URL)
+        if (data.music && music) {
+          music.src = data.music;
+          music.load();
+        }
+
+        // Cập nhật nội dung: Phân tích và tạo dòng cho hiệu ứng type
+        const rawMsg = data.msg || "";
+        // Phân tách theo dòng mới \n. Thêm một dòng trống ở đầu và cuối cho đẹp
+        const lines = ["", ...rawMsg.split("\n"), ""];
+
+        const messageContainer = document.getElementById("final-message");
+
+        // Xóa nội dung cũ
+        messageContainer.innerHTML = "";
+        fullMessageHtml = ""; // Reset biến toàn cục chứa HTML đầy đủ
+
+        lines.forEach((line) => {
+          // Xử lý dòng trống để tạo khoảng cách giữa các đoạn
+          const textContent = line.trim() === "" ? "\u00A0" : line.trim(); // Dùng non-breaking space
+
+          const lineDiv = document.createElement("div");
+          lineDiv.className = "letter-line";
+          lineDiv.setAttribute("data-full-text", textContent);
+          lineDiv.style.opacity = "0"; // Mặc định ẩn
+
+          messageContainer.appendChild(lineDiv);
+
+          // Lưu lại nội dung HTML đầy đủ
+          fullMessageHtml += `<div class="letter-line" style="min-height: 1.6em;">${textContent}</div>`;
+        });
+      };
     </script>
   </body>
 </html>
